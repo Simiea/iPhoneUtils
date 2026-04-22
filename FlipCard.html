@@ -708,10 +708,34 @@ textarea { resize: none; min-height: 84px; }
   <div class="sheet">
     <div class="handle"></div>
     <div class="modal-title" id="opts-name"></div>
-    <button class="modal-btn mbtn-plain"   id="btn-edit-deck"  style="margin-bottom:10px">✏️  Edit Deck</button>
+    <button class="modal-btn mbtn-plain"   id="btn-edit-deck"   style="margin-bottom:10px">✏️  Edit Deck</button>
+    <button class="modal-btn mbtn-plain"   id="btn-export-deck" style="margin-bottom:10px">⬆️  Export Cards (.csv)</button>
+    <button class="modal-btn mbtn-plain"   id="btn-import-deck" style="margin-bottom:10px">⬇️  Import Cards (.csv)</button>
     <button class="modal-btn mbtn-danger"  id="btn-del-deck">🗑  Delete Deck</button>
   </div>
 </div>
+
+<!-- Import sheet -->
+<div class="overlay" id="modal-import">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-title">Import Cards</div>
+    <div style="font-size:13px;color:var(--txt2);margin-bottom:16px;line-height:1.6">
+      Paste CSV below, or drop a <strong>.csv</strong> file. One card per line:<br>
+      <code style="font-size:12px;color:var(--accent)">front, back, hint (optional)</code>
+    </div>
+    <div class="field">
+      <div class="field-lbl">CSV DATA</div>
+      <textarea id="inp-import-csv" placeholder="Mitosis, Cell division producing 2 identical cells, MI = mirror&#10;ATP, Adenosine Triphosphate — energy currency&#10;Osmosis, Water across a semipermeable membrane" style="min-height:160px;font-size:13px;font-family:monospace"></textarea>
+    </div>
+    <div id="import-feedback" style="font-size:13px;margin-bottom:12px;min-height:18px"></div>
+    <button class="modal-btn mbtn-primary" id="btn-do-import">Import Cards</button>
+    <button class="modal-btn mbtn-plain"   id="btn-cancel-import" style="margin-top:10px">Cancel</button>
+  </div>
+</div>
+
+<!-- Hidden file input for CSV upload -->
+<input type="file" id="file-csv-input" accept=".csv,text/csv" style="display:none">
 
 <!-- Install Tip -->
 <div id="install-tip">
@@ -767,43 +791,78 @@ function esc(s)   { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 // ═══════════════════════════════════════════
 //  SM-2 SPACED REPETITION
 // ═══════════════════════════════════════════
+// Learning steps for brand-new / failed cards (in minutes)
+const STEPS = { again: 10, hard: 15, good: 1440, easy: 2880 }; // good=1d, easy=2d
+
 // grade: 0=again, 1=hard, 2=good, 3=easy
 function sm2(srs, grade) {
-  // SM-2 quality mapping: again=1, hard=2, good=4, easy=5
-  const q = [1, 2, 4, 5][grade];
+  const q = [1, 2, 4, 5][grade]; // SM-2 quality score
   let { interval, ef, reps } = srs;
 
-  // Update ease factor
-  ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
-
-  if (q < 3) {
-    // Failed — reset
-    reps = 0;
-    interval = 0; // reshow in this session (handled by queue logic)
-  } else {
-    if (reps === 0)      interval = 1;
-    else if (reps === 1) interval = 6;
-    else                 interval = Math.round(interval * ef);
-    reps++;
+  // Update ease factor (only after graduating from learning steps)
+  if (reps > 0) {
+    ef = Math.max(1.3, ef + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
   }
 
   const now = Date.now();
-  const due = interval === 0
-    ? now + 10 * 60 * 1000           // again: re-show in ~10 mins
-    : now + interval * 24 * 3600 * 1000;
+  let due;
+
+  if (grade === 0) {
+    // Again — reset to learning, show in 10m
+    reps = 0; interval = 0;
+    due = now + STEPS.again * 60 * 1000;
+  } else if (grade === 1) {
+    // Hard
+    if (reps === 0) {
+      // Still in learning — show in 15m
+      interval = 0;
+      due = now + STEPS.hard * 60 * 1000;
+    } else {
+      // Reviewed before — shrink interval
+      interval = Math.max(1, Math.round(interval * 1.2));
+      due = now + interval * 24 * 3600 * 1000;
+    }
+    // reps stays the same on hard
+  } else if (grade === 2) {
+    // Good
+    if (reps === 0)      { interval = 1; }
+    else if (reps === 1) { interval = 6; }
+    else                 { interval = Math.round(interval * ef); }
+    reps++;
+    due = reps === 1
+      ? now + STEPS.good * 60 * 1000   // first graduation: tomorrow
+      : now + interval * 24 * 3600 * 1000;
+  } else {
+    // Easy — always strictly longer than Good would give
+    const goodInterval = reps === 0 ? 1 : reps === 1 ? 6 : Math.round(interval * ef);
+    if (reps === 0) { interval = 2; }
+    else            { interval = Math.round(interval * ef * 1.3); }
+    interval = Math.max(interval, goodInterval + 1); // guarantee Easy > Good
+    reps++;
+    due = now + interval * 24 * 3600 * 1000;
+  }
 
   return { interval, ef, reps, due };
 }
 
 // Preview next interval as a human string, without mutating
 function previewInterval(srs, grade) {
+  const gradeNames = ['again', 'hard', 'good', 'easy'];
+  // For new cards (reps===0), show the fixed step times
+  if (!srs.reps || srs.reps === 0) {
+    const mins = STEPS[gradeNames[grade]];
+    if (mins < 60)   return mins + 'm';
+    if (mins < 1440) return Math.round(mins/60) + 'h';
+    return Math.round(mins/1440) + 'd';
+  }
   const next = sm2({ ...srs }, grade);
-  if (next.interval === 0) return '10m';
-  if (next.interval === 1) return '1d';
-  if (next.interval < 30)  return next.interval + 'd';
-  const weeks = Math.round(next.interval / 7);
-  if (weeks < 8) return weeks + 'w';
-  return Math.round(next.interval / 30) + 'mo';
+  const fmtDays = d => {
+    if (d < 30)  return d + 'd';
+    const weeks = Math.round(d / 7);
+    if (weeks < 8) return weeks + 'w';
+    return Math.round(d / 30) + 'mo';
+  };
+  return fmtDays(next.interval);
 }
 
 function dueCards(d) {
@@ -1324,6 +1383,145 @@ document.getElementById('btn-del-deck').addEventListener('click', () => {
   save(); closeOverlay('modal-opts'); renderHome(); show('home');
   TABBAR.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'home'));
 });
+
+// ═══════════════════════════════════════════
+//  IMPORT / EXPORT
+// ═══════════════════════════════════════════
+
+// ── CSV helpers ──
+function parseCSV(text) {
+  // Handle quoted fields, commas inside quotes, escaped quotes
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  return lines.map(line => {
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === ',' && !inQ) {
+        fields.push(cur.trim()); cur = '';
+      } else { cur += ch; }
+    }
+    fields.push(cur.trim());
+    return fields;
+  });
+}
+
+function toCSV(cards) {
+  const header = 'front,back,hint\n';
+  const rows = cards.map(c => {
+    const f = v => '"' + String(v||'').replace(/"/g,'""') + '"';
+    return `${f(c.front)},${f(c.back)},${f(c.hint||'')}`;
+  }).join('\n');
+  return header + rows;
+}
+
+// ── Export ──
+document.getElementById('btn-export-deck').addEventListener('click', () => {
+  const d = deck(activeDeckId);
+  closeOverlay('modal-opts');
+  if (!d || d.cards.length === 0) { alert('No cards to export.'); return; }
+  const csv  = toCSV(d.cards);
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = d.name.replace(/[^a-z0-9]/gi,'_') + '_cards.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ── Import — open sheet ──
+document.getElementById('btn-import-deck').addEventListener('click', () => {
+  closeOverlay('modal-opts');
+  document.getElementById('inp-import-csv').value = '';
+  document.getElementById('import-feedback').textContent = '';
+  document.getElementById('import-feedback').style.color = '';
+  setTimeout(() => openOverlay('modal-import'), 260);
+});
+
+// Allow dragging a .csv file onto the textarea
+const importTA = document.getElementById('inp-import-csv');
+importTA.addEventListener('dragover', e => { e.preventDefault(); importTA.style.borderColor = 'var(--accent)'; });
+importTA.addEventListener('dragleave', () => { importTA.style.borderColor = ''; });
+importTA.addEventListener('drop', e => {
+  e.preventDefault(); importTA.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (file) readCSVFile(file);
+});
+
+// Also allow tapping to pick a file on mobile
+importTA.addEventListener('click', (e) => {
+  // Only trigger file picker if textarea is empty (avoid interfering with typing)
+  if (!importTA.value.trim()) document.getElementById('file-csv-input').click();
+});
+document.getElementById('file-csv-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) readCSVFile(file);
+  e.target.value = '';
+});
+
+function readCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    importTA.value = ev.target.result;
+    previewImport();
+  };
+  reader.readAsText(file);
+}
+
+function previewImport() {
+  const rows = parseCSV(importTA.value);
+  const valid = rows.filter(r => r[0] && r[1]);
+  const fb = document.getElementById('import-feedback');
+  if (!valid.length) {
+    fb.textContent = 'No valid rows detected yet.';
+    fb.style.color = 'var(--txt3)';
+  } else {
+    fb.textContent = `✓ ${valid.length} card${valid.length!==1?'s':''} ready to import`;
+    fb.style.color = 'var(--green)';
+  }
+}
+importTA.addEventListener('input', previewImport);
+
+document.getElementById('btn-do-import').addEventListener('click', () => {
+  const rows  = parseCSV(importTA.value);
+  const valid = rows.filter(r => r[0] && r[1]);
+  if (!valid.length) {
+    const fb = document.getElementById('import-feedback');
+    fb.textContent = 'Nothing to import — check your CSV format.';
+    fb.style.color = 'var(--red)';
+    return;
+  }
+  const d   = deck(activeDeckId);
+  const now = Date.now();
+  let added = 0;
+  valid.forEach(([front, back, hint = '']) => {
+    // Skip exact duplicates (same front+back already in deck)
+    const exists = d.cards.some(c => c.front.toLowerCase() === front.toLowerCase() && c.back.toLowerCase() === back.toLowerCase());
+    if (!exists) {
+      d.cards.push({ id: uid(), front, back, hint, srs: { interval: 0, ef: 2.5, reps: 0, due: now } });
+      added++;
+    }
+  });
+  const skipped = valid.length - added;
+  save();
+  closeOverlay('modal-import');
+  openDeck(activeDeckId);
+  // Brief toast-style feedback via alert (keep it simple)
+  const msg = `Imported ${added} card${added!==1?'s':''}` + (skipped ? ` (${skipped} duplicate${skipped!==1?'s':''} skipped)` : '') + '.';
+  setTimeout(() => {
+    const fb = document.createElement('div');
+    fb.style.cssText = `position:fixed;top:calc(env(safe-area-inset-top,59px)+12px);left:50%;transform:translateX(-50%);background:var(--surf2);border:1px solid var(--border);border-radius:99px;padding:10px 20px;font-size:13px;font-weight:700;color:var(--green);z-index:400;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4)`;
+    fb.textContent = '✓ ' + msg;
+    document.body.appendChild(fb);
+    setTimeout(() => fb.remove(), 2800);
+  }, 350);
+});
+
+document.getElementById('btn-cancel-import').addEventListener('click', () => closeOverlay('modal-import'));
 
 // ═══════════════════════════════════════════
 //  WIRE UP
