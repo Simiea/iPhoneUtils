@@ -775,6 +775,12 @@ db.decks    = db.decks    || [];
 db.sessions = db.sessions || [];
 db.streak   = db.streak   || { count: 0, lastDate: null };
 
+// ── Utility functions (must be defined before any calls below) ──
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function uid()  { return Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function deck(id) { return db.decks.find(d => d.id === id); }
+function esc(s)   { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 // Migrate old data (v3 → v4): ensure every card has SRS fields
 db.decks.forEach(d => d.cards.forEach(c => {
   if (!c.srs) c.srs = { interval: 0, ef: 2.5, reps: 0, due: Date.now() };
@@ -798,11 +804,6 @@ if (db.decks.length === 0) {
   ];
   save();
 }
-
-function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
-function uid()  { return Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
-function deck(id) { return db.decks.find(d => d.id === id); }
-function esc(s)   { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ═══════════════════════════════════════════
 //  SM-2 SPACED REPETITION
