@@ -264,9 +264,17 @@ body {
   background: rgba(248,113,113,.12); border: none;
   color: var(--red); font-size: 16px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
+  cursor: pointer; flex-shrink: 0;
 }
 .del-btn:active { background: rgba(248,113,113,.25); }
+.edit-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: rgba(255,255,255,.06); border: none;
+  color: var(--txt2); font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.edit-btn:active { background: rgba(255,255,255,.12); color: var(--txt); }
 .add-card-btn {
   width: 100%; padding: 15px;
   background: var(--surf); border: 2px dashed rgba(255,255,255,.1);
@@ -586,6 +594,7 @@ textarea { resize: none; min-height: 84px; }
       <button class="back-btn" id="btn-back-study">Exit</button>
       <div class="study-title" id="study-title"></div>
       <div class="study-count" id="study-count"></div>
+      <button class="icon-btn" id="btn-prev-card" style="font-size:18px;opacity:0.35;pointer-events:none">←</button>
     </div>
     <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
 
@@ -1059,7 +1068,9 @@ function renderCards(d) {
         <div class="card-back-p">${esc(c.back)}</div>
       </div>
       ${badge}
-      <button class="del-btn" data-i="${i}">🗑</button>`;
+      <button class="edit-btn" data-i="${i}">✏️</button>
+      <button class="del-btn"  data-i="${i}">🗑</button>`;
+    el.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); openEditCard(d.id, i); });
     el.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); delCard(d.id, i); });
     list.appendChild(el);
   });
@@ -1068,11 +1079,20 @@ function renderCards(d) {
 function delCard(deckId, i) {
   const d = deck(deckId);
   d.cards.splice(i, 1); save();
-  renderCards(d);
-  document.getElementById('d-meta').textContent = `${d.cards.length} card${d.cards.length!==1?'s':''}`;
-  const sb = document.getElementById('btn-study');
-  sb.disabled = d.cards.length === 0;
-  sb.textContent = d.cards.length === 0 ? 'Add Cards to Study' : `Study ${d.cards.length} Cards →`;
+  openDeck(deckId);
+}
+
+function openEditCard(deckId, i) {
+  const d = deck(deckId);
+  const c = d.cards[i];
+  editCardIdx = i;
+  document.getElementById('mcard-title').textContent   = 'Edit Card';
+  document.getElementById('inp-front').value           = c.front;
+  document.getElementById('inp-back').value            = c.back;
+  document.getElementById('inp-hint').value            = c.hint || '';
+  document.getElementById('btn-save-card').textContent = 'Save Changes';
+  openOverlay('modal-card');
+  setTimeout(() => document.getElementById('inp-front').focus(), 380);
 }
 
 // ═══════════════════════════════════════════
@@ -1097,7 +1117,8 @@ function startStudy(id, mode = 'due') {
     deckId: id, deck: d, mode,
     queue: cards,
     index: 0, results: [], flipped: false,
-    againQueue: [], // cards to re-show at end
+    againQueue: [],
+    history: [], // [{index, card, srs, result}] for undo
   };
   document.getElementById('study-title').textContent = d.name;
   renderStudyCard();
@@ -1106,7 +1127,7 @@ function startStudy(id, mode = 'due') {
 }
 
 function renderStudyCard() {
-  const { queue, index, deck: d } = studyState;
+  const { queue, index, deck: d, history } = studyState;
   const card = queue[index];
   document.getElementById('study-count').textContent = `${index+1} / ${queue.length}`;
   document.getElementById('prog-fill').style.cssText = `width:${(index/queue.length)*100}%;background:${d.color}`;
@@ -1119,6 +1140,12 @@ function renderStudyCard() {
   studyState.flipped = false;
   document.getElementById('reveal-wrap').style.display = 'block';
   document.getElementById('grade-row').style.display   = 'none';
+
+  // Enable/disable back button
+  const prevBtn = document.getElementById('btn-prev-card');
+  const canGoBack = history && history.length > 0;
+  prevBtn.style.opacity = canGoBack ? '1' : '0.35';
+  prevBtn.style.pointerEvents = canGoBack ? 'auto' : 'none';
 }
 
 function showIntervalPreviews(card) {
@@ -1142,10 +1169,18 @@ function grade(g) {
   const gradeNum = gradeMap[g];
   const card = studyState.queue[studyState.index];
 
+  // Save snapshot to history before mutating anything
+  studyState.history.push({
+    index:   studyState.index,
+    cardId:  card.id,
+    srs:     { ...card.srs },          // copy of SRS before grading
+    result:  g,
+    queueLength: studyState.queue.length,
+  });
+
   // Apply SM-2 and save to the card object in db
   const newSrs = sm2(card.srs || { interval: 0, ef: 2.5, reps: 0, due: Date.now() }, gradeNum);
   card.srs = newSrs;
-  // Also update in the real deck
   const realCard = studyState.deck.cards.find(c => c.id === card.id);
   if (realCard) realCard.srs = newSrs;
   save();
@@ -1163,6 +1198,33 @@ function grade(g) {
   const fl = document.getElementById('flipper');
   fl.classList.add('exit');
   setTimeout(() => { fl.classList.remove('exit'); studyState.index++; renderStudyCard(); }, 230);
+}
+
+function goBack() {
+  if (!studyState.history || studyState.history.length === 0) return;
+
+  const snap = studyState.history.pop();
+
+  // Undo: restore the card's SRS to what it was before grading
+  const card = studyState.queue[snap.index];
+  card.srs = { ...snap.srs };
+  const realCard = studyState.deck.cards.find(c => c.id === snap.cardId);
+  if (realCard) realCard.srs = { ...snap.srs };
+
+  // Remove the last result
+  studyState.results.pop();
+
+  // If the grade was 'again', a copy was appended — remove it
+  if (snap.result === 'again' && studyState.queue.length > snap.queueLength) {
+    studyState.queue.pop();
+  }
+
+  save();
+  studyState.index = snap.index;
+
+  const fl = document.getElementById('flipper');
+  fl.classList.add('exit');
+  setTimeout(() => { fl.classList.remove('exit'); renderStudyCard(); }, 230);
 }
 
 function finishStudy() {
@@ -1535,6 +1597,7 @@ document.getElementById('btn-back-deck').addEventListener('click', () => { rende
 document.getElementById('btn-study').addEventListener('click', () => startStudy(activeDeckId, 'all'));
 document.getElementById('btn-study-due').addEventListener('click', () => startStudy(activeDeckId, 'due'));
 document.getElementById('btn-study-all').addEventListener('click', () => startStudy(activeDeckId, 'all'));
+document.getElementById('btn-prev-card').addEventListener('click', goBack);
 document.getElementById('btn-reveal').addEventListener('click', flip);
 document.getElementById('flipper').addEventListener('click', flip);
 document.getElementById('grade-row').querySelectorAll('.grade-btn').forEach(b => b.addEventListener('click', () => grade(b.dataset.g)));
