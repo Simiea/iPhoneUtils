@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -822,7 +819,7 @@ textarea { resize: none; min-height: 84px; }
 </div>
 
 <!-- Card Preview overlay -->
-<div class="overlay" id="modal-preview" style="z-index:350">
+<div class="overlay" id="modal-preview">
   <div class="sheet" style="background:var(--bg);border-radius:28px 28px 0 0;padding-bottom:env(safe-area-inset-bottom,20px)">
     <div class="handle"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
@@ -914,6 +911,7 @@ textarea { resize: none; min-height: 84px; }
 
 <!-- Hidden file input for JSON restore -->
 <input type="file" id="file-json-input" accept=".json,application/json" style="display:none">
+<input type="file" id="file-csv-input" accept=".csv,text/csv" style="display:none">
 
 <!-- Import All confirmation modal -->
 <div class="overlay" id="modal-import-all">
@@ -1853,7 +1851,8 @@ function openPreview() {
   previewFlipped = false;
   document.getElementById('preview-flipper').style.transform = '';
 
-  openOverlay('modal-preview');
+  closeOverlay('modal-card');
+  setTimeout(() => openOverlay('modal-preview'), 260);
 }
 
 document.getElementById('btn-preview-card').addEventListener('click', openPreview);
@@ -1865,6 +1864,7 @@ document.getElementById('preview-flipper-wrap').addEventListener('click', () => 
 
 document.getElementById('btn-close-preview').addEventListener('click', () => {
   closeOverlay('modal-preview');
+  setTimeout(() => openOverlay('modal-card'), 260);
 });
 
 document.getElementById('btn-add-card').addEventListener('click', () => {
@@ -2248,6 +2248,7 @@ document.addEventListener('touchmove', e => {
 //  BOOT
 // ═══════════════════════════════════════════
 renderHome();
+show('home');
 </script>
 </body>
 </html>
