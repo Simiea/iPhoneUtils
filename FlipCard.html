@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -735,6 +732,22 @@ textarea { resize: none; min-height: 84px; }
     <div class="hdr"><h1>Stats</h1></div>
     <div class="scroll-body">
       <div id="stats-body" style="padding:0 16px 32px"></div>
+      <div style="margin:0 20px 40px">
+        <div class="sec-label" style="margin-bottom:12px">DATA BACKUP</div>
+        <div style="background:var(--surf);border:1px solid var(--border);border-radius:18px;overflow:hidden">
+          <button class="modal-btn mbtn-plain" id="btn-export-all" style="border-radius:0;border:none;border-bottom:1px solid var(--border);margin:0;text-align:left;padding:16px 18px">
+            📤  Export All Data
+            <div style="font-size:11px;color:var(--txt2);font-weight:500;margin-top:2px">Save all decks, cards &amp; SRS progress as a .json file</div>
+          </button>
+          <button class="modal-btn mbtn-plain" id="btn-import-all" style="border-radius:0;border:none;margin:0;text-align:left;padding:16px 18px">
+            📥  Import / Restore Data
+            <div style="font-size:11px;color:var(--txt2);font-weight:500;margin-top:2px">Restore from a previously exported .json backup</div>
+          </button>
+        </div>
+        <div style="font-size:11px;color:var(--txt3);margin-top:10px;line-height:1.6;text-align:center">
+          Import merges with existing data — no cards are deleted
+        </div>
+      </div>
     </div>
   </div>
 
@@ -801,6 +814,65 @@ textarea { resize: none; min-height: 84px; }
       <input type="text" id="inp-hint" placeholder="Memory trick...">
     </div>
     <button class="modal-btn mbtn-primary" id="btn-save-card">Add Card</button>
+    <button class="modal-btn mbtn-plain" id="btn-preview-card" style="margin-top:10px">👁 Preview Card</button>
+  </div>
+</div>
+
+<!-- Card Preview overlay -->
+<div class="overlay" id="modal-preview" style="z-index:350">
+  <div class="sheet" style="background:var(--bg);border-radius:28px 28px 0 0;padding-bottom:env(safe-area-inset-bottom,20px)">
+    <div class="handle"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:0 20px 16px">
+      <div style="font-size:16px;font-weight:800">Preview</div>
+      <div style="font-size:12px;color:var(--txt2)">Tap card to flip</div>
+    </div>
+    <!-- Mini card preview -->
+    <div style="padding:0 20px 20px">
+      <div style="perspective:1200px;height:220px;cursor:pointer" id="preview-flipper-wrap">
+        <div id="preview-flipper" style="
+          width:100%;height:100%;position:relative;
+          transform-style:preserve-3d;transition:transform .45s cubic-bezier(.4,0,.2,1);
+        ">
+          <!-- Front -->
+          <div style="
+            position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+            background:var(--surf2);border:1px solid var(--border);border-radius:22px;
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            padding:20px;gap:10px;overflow:hidden;
+          ">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--txt3);margin-bottom:4px">QUESTION</div>
+            <div id="pv-img-wrap" style="display:none;width:100%;text-align:center">
+              <img id="pv-img" src="" alt="" style="max-height:100px;max-width:100%;border-radius:10px;object-fit:contain">
+            </div>
+            <div id="pv-front" style="font-size:clamp(18px,5vw,32px);font-weight:800;text-align:center;line-height:1.3;word-break:break-word"></div>
+          </div>
+          <!-- Back -->
+          <div style="
+            position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+            transform:rotateY(180deg);
+            background:var(--surf2);border:1px solid var(--border);border-radius:22px;
+            display:flex;flex-direction:column;align-items:center;justify-content:center;
+            padding:20px;gap:10px;
+          ">
+            <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--txt3);margin-bottom:4px">ANSWER</div>
+            <div id="pv-back" style="font-size:clamp(15px,4vw,24px);font-weight:600;text-align:center;line-height:1.4;word-break:break-word"></div>
+            <div id="pv-hint-wrap" style="display:none;margin-top:6px">
+              <div style="font-size:11px;color:var(--txt2);background:rgba(255,255,255,.06);border-radius:99px;padding:4px 12px">💡 <span id="pv-hint"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Grade buttons preview (non-functional, just visual) -->
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <div style="flex:1;padding:10px 4px;border-radius:14px;border:1.5px solid rgba(248,113,113,.3);background:rgba(248,113,113,.08);text-align:center;font-size:12px;font-weight:700;color:var(--red)">↺<br><span style="font-size:10px;opacity:.7">10m</span></div>
+        <div style="flex:1;padding:10px 4px;border-radius:14px;border:1.5px solid rgba(251,191,36,.3);background:rgba(251,191,36,.08);text-align:center;font-size:12px;font-weight:700;color:var(--yellow)">〜<br><span style="font-size:10px;opacity:.7">15m</span></div>
+        <div style="flex:1;padding:10px 4px;border-radius:14px;border:1.5px solid rgba(74,222,128,.3);background:rgba(74,222,128,.08);text-align:center;font-size:12px;font-weight:700;color:var(--green)">✓<br><span style="font-size:10px;opacity:.7">1d</span></div>
+        <div style="flex:1;padding:10px 4px;border-radius:14px;border:1.5px solid rgba(96,165,250,.3);background:rgba(96,165,250,.08);text-align:center;font-size:12px;font-weight:700;color:#60A5FA">⚡<br><span style="font-size:10px;opacity:.7">2d</span></div>
+      </div>
+    </div>
+    <div style="padding:0 20px 8px;display:flex;gap:10px">
+      <button class="modal-btn mbtn-plain" id="btn-close-preview" style="flex:1;margin:0">← Back to Edit</button>
+    </div>
   </div>
 </div>
 
@@ -824,7 +896,8 @@ textarea { resize: none; min-height: 84px; }
     <div class="modal-title">Import Cards</div>
     <div style="font-size:13px;color:var(--txt2);margin-bottom:16px;line-height:1.6">
       Paste CSV below, or drop a <strong>.csv</strong> file. One card per line:<br>
-      <code style="font-size:12px;color:var(--accent)">front, back, hint (optional)</code>
+      <code style="font-size:12px;color:var(--accent)">front, back, hint (optional), subdeck (optional)</code><br><br>
+      If a <strong>subdeck</strong> name is provided, cards will be automatically sorted into subdecks under this deck.
     </div>
     <div class="field">
       <div class="field-lbl">CSV DATA</div>
@@ -836,8 +909,22 @@ textarea { resize: none; min-height: 84px; }
   </div>
 </div>
 
-<!-- Hidden file input for CSV upload -->
-<input type="file" id="file-csv-input" accept=".csv,text/csv" style="display:none">
+<!-- Hidden file input for JSON restore -->
+<input type="file" id="file-json-input" accept=".json,application/json" style="display:none">
+
+<!-- Import All confirmation modal -->
+<div class="overlay" id="modal-import-all">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="modal-title">Restore Backup</div>
+    <div style="font-size:13px;color:var(--txt2);margin-bottom:20px;line-height:1.6">
+      Found <strong id="import-all-summary"></strong>.<br><br>
+      This will <strong style="color:var(--green)">merge</strong> with your existing data — decks and cards that already exist won't be duplicated, and no existing data will be deleted.
+    </div>
+    <button class="modal-btn mbtn-primary" id="btn-confirm-import-all">Restore Now</button>
+    <button class="modal-btn mbtn-plain"   id="btn-cancel-import-all" style="margin-top:10px">Cancel</button>
+  </div>
+</div>
 
 <!-- Install Tip -->
 <div id="install-tip">
@@ -1728,6 +1815,55 @@ imgArea.addEventListener('drop', e => {
   }
 });
 
+// ── Card Preview ──
+let previewFlipped = false;
+
+function openPreview() {
+  const front = document.getElementById('inp-front').value.trim();
+  const back  = document.getElementById('inp-back').value.trim();
+  const hint  = document.getElementById('inp-hint').value.trim();
+
+  // Populate front
+  document.getElementById('pv-front').textContent = front || (pendingImage ? '' : 'No question yet');
+  document.getElementById('pv-back').textContent  = back  || 'No answer yet';
+
+  // Image
+  const pvImg = document.getElementById('pv-img');
+  const pvImgWrap = document.getElementById('pv-img-wrap');
+  if (pendingImage) {
+    pvImg.src = pendingImage;
+    pvImgWrap.style.display = 'block';
+  } else {
+    pvImgWrap.style.display = 'none';
+  }
+
+  // Hint
+  const hintWrap = document.getElementById('pv-hint-wrap');
+  if (hint) {
+    document.getElementById('pv-hint').textContent = hint;
+    hintWrap.style.display = 'block';
+  } else {
+    hintWrap.style.display = 'none';
+  }
+
+  // Reset to front face
+  previewFlipped = false;
+  document.getElementById('preview-flipper').style.transform = '';
+
+  openOverlay('modal-preview');
+}
+
+document.getElementById('btn-preview-card').addEventListener('click', openPreview);
+
+document.getElementById('preview-flipper-wrap').addEventListener('click', () => {
+  previewFlipped = !previewFlipped;
+  document.getElementById('preview-flipper').style.transform = previewFlipped ? 'rotateY(180deg)' : '';
+});
+
+document.getElementById('btn-close-preview').addEventListener('click', () => {
+  closeOverlay('modal-preview');
+});
+
 document.getElementById('btn-add-card').addEventListener('click', () => {
   editCardIdx = null;
   pendingImage = null;
@@ -1871,11 +2007,18 @@ function readCSVFile(file) {
 
 function previewImport() {
   const rows = parseCSV(importTA.value);
-  const valid = rows.filter(r => r[0] && r[1]);
+  // Skip header row if present
+  const dataRows = rows.filter(r => r[0] && r[1] && r[0].toLowerCase() !== 'front');
+  const valid = dataRows.filter(r => r[0] && r[1]);
+  const hasDecks = valid.some(r => r[3] && r[3].trim());
   const fb = document.getElementById('import-feedback');
   if (!valid.length) {
     fb.textContent = 'No valid rows detected yet.';
     fb.style.color = 'var(--txt3)';
+  } else if (hasDecks) {
+    const deckNames = [...new Set(valid.map(r => r[3]).filter(Boolean))];
+    fb.textContent = `✓ ${valid.length} cards across ${deckNames.length} subdeck${deckNames.length!==1?'s':''}: ${deckNames.join(', ')}`;
+    fb.style.color = 'var(--green)';
   } else {
     fb.textContent = `✓ ${valid.length} card${valid.length!==1?'s':''} ready to import`;
     fb.style.color = 'var(--green)';
@@ -1885,40 +2028,179 @@ importTA.addEventListener('input', previewImport);
 
 document.getElementById('btn-do-import').addEventListener('click', () => {
   const rows  = parseCSV(importTA.value);
-  const valid = rows.filter(r => r[0] && r[1]);
+  const valid = rows.filter(r => r[0] && r[1] && r[0].toLowerCase() !== 'front');
   if (!valid.length) {
     const fb = document.getElementById('import-feedback');
     fb.textContent = 'Nothing to import — check your CSV format.';
     fb.style.color = 'var(--red)';
     return;
   }
-  const d   = deck(activeDeckId);
+
   const now = Date.now();
-  let added = 0;
-  valid.forEach(([front, back, hint = '']) => {
-    // Skip exact duplicates (same front+back already in deck)
-    const exists = d.cards.some(c => c.front.toLowerCase() === front.toLowerCase() && c.back.toLowerCase() === back.toLowerCase());
-    if (!exists) {
-      d.cards.push({ id: uid(), front, back, hint, srs: { interval: 0, ef: 2.5, reps: 0, due: now } });
-      added++;
-    }
+  const parentDeck = deck(activeDeckId);
+  let added = 0, skipped = 0;
+
+  // Group cards by subdeck name (col 4), empty = goes into parent deck
+  const groups = {};
+  valid.forEach(row => {
+    const [front, back, hint = '', subdeckName = ''] = row;
+    const key = subdeckName.trim();
+    if (!groups[key]) groups[key] = [];
+    groups[key].push({ front, back, hint: hint || '' });
   });
-  const skipped = valid.length - added;
+
+  Object.entries(groups).forEach(([subdeckName, cards]) => {
+    let targetDeck;
+    if (!subdeckName) {
+      // No subdeck column — import straight into parent
+      targetDeck = parentDeck;
+    } else {
+      // Find or create subdeck with this name under activeDeckId
+      targetDeck = db.decks.find(d => d.parentId === activeDeckId &&
+        d.name.toLowerCase() === subdeckName.toLowerCase());
+      if (!targetDeck) {
+        targetDeck = {
+          id: uid(), name: subdeckName,
+          emoji: parentDeck.emoji, color: parentDeck.color,
+          created: now, cards: [], parentId: activeDeckId
+        };
+        db.decks.push(targetDeck);
+      }
+    }
+
+    cards.forEach(({ front, back, hint }) => {
+      const exists = targetDeck.cards.some(
+        c => c.front.toLowerCase() === front.toLowerCase() &&
+             c.back.toLowerCase()  === back.toLowerCase()
+      );
+      if (!exists) {
+        targetDeck.cards.push({ id: uid(), front, back, hint,
+          srs: { interval: 0, ef: 2.5, reps: 0, due: now } });
+        added++;
+      } else { skipped++; }
+    });
+  });
+
   save();
   closeOverlay('modal-import');
   openDeck(activeDeckId);
-  // Brief toast-style feedback via alert (keep it simple)
-  const msg = `Imported ${added} card${added!==1?'s':''}` + (skipped ? ` (${skipped} duplicate${skipped!==1?'s':''} skipped)` : '') + '.';
-  setTimeout(() => {
-    const fb = document.createElement('div');
-    fb.style.cssText = `position:fixed;top:calc(env(safe-area-inset-top,59px)+12px);left:50%;transform:translateX(-50%);background:var(--surf2);border:1px solid var(--border);border-radius:99px;padding:10px 20px;font-size:13px;font-weight:700;color:var(--green);z-index:400;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4)`;
-    fb.textContent = '✓ ' + msg;
-    document.body.appendChild(fb);
-    setTimeout(() => fb.remove(), 2800);
-  }, 350);
+  const subdeckCount = Object.keys(groups).filter(k => k).length;
+  let msg = `Imported ${added} card${added!==1?'s':''}`;
+  if (subdeckCount > 0) msg += ` into ${subdeckCount} subdeck${subdeckCount!==1?'s':''}`;
+  if (skipped) msg += ` (${skipped} duplicate${skipped!==1?'s':''} skipped)`;
+  setTimeout(() => showToast('✓ ' + msg), 350);
 });
 
 document.getElementById('btn-cancel-import').addEventListener('click', () => closeOverlay('modal-import'));
+
+// ═══════════════════════════════════════════
+//  EXPORT ALL / IMPORT ALL (full backup)
+// ═══════════════════════════════════════════
+function showToast(msg, color = 'var(--green)') {
+  const fb = document.createElement('div');
+  fb.style.cssText = `position:fixed;top:calc(env(safe-area-inset-top,59px)+12px);left:50%;transform:translateX(-50%);background:var(--surf2);border:1px solid var(--border);border-radius:99px;padding:10px 20px;font-size:13px;font-weight:700;color:${color};z-index:400;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.4)`;
+  fb.textContent = msg;
+  document.body.appendChild(fb);
+  setTimeout(() => fb.remove(), 2800);
+}
+
+document.getElementById('btn-export-all').addEventListener('click', () => {
+  const payload = JSON.stringify({ version: 4, exportedAt: Date.now(), ...db }, null, 2);
+  const blob = new Blob([payload], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `flipcard_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  setTimeout(() => showToast('✓ Backup saved!'), 300);
+});
+
+let pendingImportData = null;
+
+document.getElementById('btn-import-all').addEventListener('click', () => {
+  document.getElementById('file-json-input').click();
+});
+
+document.getElementById('file-json-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.decks || !Array.isArray(data.decks)) throw new Error('Invalid backup file');
+      pendingImportData = data;
+      const deckCount = data.decks.length;
+      const cardCount = data.decks.reduce((a, d) => a + (d.cards?.length || 0), 0);
+      document.getElementById('import-all-summary').textContent =
+        `${deckCount} deck${deckCount!==1?'s':''} and ${cardCount} card${cardCount!==1?'s':''}`;
+      openOverlay('modal-import-all');
+    } catch {
+      showToast('❌ Invalid backup file', 'var(--red)');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('btn-confirm-import-all').addEventListener('click', () => {
+  if (!pendingImportData) return;
+  const data = pendingImportData;
+
+  // Merge decks — skip any deck whose id already exists
+  let addedDecks = 0, addedCards = 0;
+  (data.decks || []).forEach(importedDeck => {
+    const existing = deck(importedDeck.id);
+    if (!existing) {
+      // New deck — add wholesale, ensure cards have SRS
+      const now = Date.now();
+      importedDeck.cards = (importedDeck.cards || []).map(c => ({
+        ...c,
+        srs: c.srs || { interval: 0, ef: 2.5, reps: 0, due: now }
+      }));
+      db.decks.push(importedDeck);
+      addedDecks++;
+      addedCards += importedDeck.cards.length;
+    } else {
+      // Deck exists — merge in any cards not already present (by id)
+      const existingIds = new Set(existing.cards.map(c => c.id));
+      const newCards = (importedDeck.cards || []).filter(c => !existingIds.has(c.id));
+      newCards.forEach(c => {
+        if (!c.srs) c.srs = { interval: 0, ef: 2.5, reps: 0, due: Date.now() };
+      });
+      existing.cards.push(...newCards);
+      addedCards += newCards.length;
+    }
+  });
+
+  // Merge sessions (prepend, deduplicate by date+deckId)
+  if (data.sessions) {
+    const existingKeys = new Set(db.sessions.map(s => `${s.deckId}-${s.date}`));
+    const newSessions = data.sessions.filter(s => !existingKeys.has(`${s.deckId}-${s.date}`));
+    db.sessions = [...newSessions, ...db.sessions].slice(0, 60);
+  }
+
+  // Take the higher streak
+  if (data.streak && data.streak.count > db.streak.count) {
+    db.streak = data.streak;
+  }
+
+  save();
+  closeOverlay('modal-import-all');
+  pendingImportData = null;
+  renderHome();
+  renderStats();
+  const msg = addedDecks > 0
+    ? `✓ Restored ${addedDecks} deck${addedDecks!==1?'s':''} + ${addedCards} cards`
+    : `✓ Merged ${addedCards} new card${addedCards!==1?'s':''}`;
+  setTimeout(() => showToast(msg), 300);
+});
+
+document.getElementById('btn-cancel-import-all').addEventListener('click', () => {
+  pendingImportData = null;
+  closeOverlay('modal-import-all');
+});
 
 // ═══════════════════════════════════════════
 //  WIRE UP
