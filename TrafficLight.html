@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Traffic Light">
+<meta name="theme-color" content="#0D0D0D">
+<title>Traffic Light</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230D0D0D'/%3E%3Crect x='70' y='18' width='40' height='144' rx='20' fill='%23222'/%3E%3Ccircle cx='90' cy='50' r='16' fill='%23F87171'/%3E%3Ccircle cx='90' cy='90' r='16' fill='%23FBBF24'/%3E%3Ccircle cx='90' cy='130' r='16' fill='%234ADE80'/%3E%3C/svg%3E">
+<style>
+
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+/* ── TOKENS ── */
+:root {
+  --bg:       #0D0D0D;
+  --surf:     #161616;
+  --surf2:    #1F1F1F;
+  --surf3:    #282828;
+  --border:   rgba(255,255,255,0.06);
+  --txt:      #F0F0F0;
+  --txt2:     rgba(240,240,240,0.45);
+  --txt3:     rgba(240,240,240,0.18);
+
+  --red:      #F87171;
+  --red-dim:  rgba(248,113,113,0.12);
+  --red-glow: rgba(248,113,113,0.25);
+  --amber:    #FBBF24;
+  --amb-dim:  rgba(251,191,36,0.12);
+  --amb-glow: rgba(251,191,36,0.25);
+  --green:    #4ADE80;
+  --grn-dim:  rgba(74,222,128,0.12);
+  --grn-glow: rgba(74,222,128,0.25);
+
+  --sat: env(safe-area-inset-top,    59px);
+  --sab: env(safe-area-inset-bottom, 34px);
+}
+
+/* ── ROOT ── */
+html { height: 100%; background: var(--bg); }
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: 'Georgia', 'Times New Roman', serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  padding-top:    env(safe-area-inset-top,    59px);
+  padding-bottom: env(safe-area-inset-bottom, 34px);
+}
+
+/* ── APP ── */
+#app {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── SCREENS ── */
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  opacity: 0; pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.screen.active { opacity: 1; pointer-events: all; transform: translateY(0); }
+
+/* ── SCROLL ── */
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* ── HEADER ── */
+.hdr {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px 12px;
+  flex-shrink: 0;
+}
+.hdr-title {
+  flex: 1;
+  font-size: 26px; font-weight: 700;
+  font-style: italic;
+  letter-spacing: -0.5px;
+}
+.hdr-title span { font-style: normal; }
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--surf2); border: 1px solid var(--border);
+  color: var(--txt); font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0;
+}
+.back-btn {
+  background: none; border: none;
+  color: var(--red); font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center;
+  padding: 6px 0; white-space: nowrap;
+  font-family: inherit;
+}
+.back-btn::before { content: '‹'; font-size: 26px; line-height: 1; margin-right: 2px; }
+
+/* ── TAB BAR ── */
+#tabbar {
+  flex-shrink: 0;
+  display: flex;
+  background: rgba(13,13,13,0.96);
+  border-top: 1px solid var(--border);
+  padding: 8px 0 10px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.tab {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 3px;
+  cursor: pointer; opacity: 0.28;
+  transition: opacity .15s; padding: 4px 0;
+}
+.tab.active { opacity: 1; }
+.tab-icon  { font-size: 22px; line-height: 1; }
+.tab-label { font-size: 10px; font-weight: 700; letter-spacing: .3px; color: var(--txt); font-family: -apple-system, sans-serif; }
+
+/* ── HOME SUMMARY BAR ── */
+.summary-strip {
+  display: flex; gap: 10px;
+  padding: 0 16px 18px;
+}
+.sum-box {
+  flex: 1; border-radius: 16px;
+  padding: 14px 10px; text-align: center;
+  border: 1px solid;
+  position: relative; overflow: hidden;
+}
+.sum-box::before {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0.08;
+}
+.sum-box.red-box   { border-color: rgba(248,113,113,.3); }
+.sum-box.red-box::before   { background: var(--red); }
+.sum-box.amb-box   { border-color: rgba(251,191,36,.3); }
+.sum-box.amb-box::before   { background: var(--amber); }
+.sum-box.grn-box   { border-color: rgba(74,222,128,.3); }
+.sum-box.grn-box::before   { background: var(--green); }
+.sum-num { font-size: 30px; font-weight: 700; position: relative; font-style: italic; }
+.sum-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: var(--txt2); margin-top: 2px; position: relative; font-family: -apple-system, sans-serif; }
+.sum-box.red-box .sum-num { color: var(--red); }
+.sum-box.amb-box .sum-num { color: var(--amber); }
+.sum-box.grn-box .sum-num { color: var(--green); }
+
+/* ── SUBJECT CARD ── */
+.subj-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  margin: 0 16px 12px;
+  overflow: hidden;
+  transition: transform .12s;
+  cursor: pointer;
+}
+.subj-card:active { transform: scale(.98); }
+.subj-top {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 16px 12px;
+}
+.subj-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.subj-info { flex: 1; min-width: 0; }
+.subj-name {
+  font-size: 17px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.subj-meta { font-size: 12px; color: var(--txt2); margin-top: 3px; font-family: -apple-system, sans-serif; }
+.subj-count {
+  font-size: 13px; font-weight: 700;
+  color: var(--txt2); font-style: italic;
+}
+
+/* mini traffic light inline */
+.mini-tl {
+  display: flex; gap: 4px; align-items: center;
+  padding: 0 16px 14px;
+}
+.mini-seg {
+  height: 5px; border-radius: 99px;
+  transition: width .4s ease;
+  min-width: 4px;
+}
+
+/* ── SECTION LABEL ── */
+.sec-lbl {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.8px;
+  color: var(--txt3); padding: 0 20px 10px;
+  font-family: -apple-system, sans-serif;
+}
+
+/* ── ADD SUBJECT BTN ── */
+.add-subj-btn {
+  width: calc(100% - 32px); margin: 0 16px 32px;
+  padding: 15px;
+  background: var(--surf);
+  border: 2px dashed rgba(255,255,255,.1);
+  border-radius: 20px; color: var(--txt2);
+  font-size: 15px; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.add-subj-btn:active { background: var(--surf2); }
+
+/* ── SUBJECT DETAIL ── */
+.subj-hero {
+  padding: 12px 20px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center;
+}
+
+/* big traffic light visual */
+.tl-visual {
+  width: 52px;
+  background: var(--surf2);
+  border-radius: 28px;
+  padding: 8px 0;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 6px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.tl-light {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  transition: background .3s, box-shadow .3s;
+}
+.tl-light.off { background: rgba(255,255,255,.06); }
+.tl-light.on-red    { background: var(--red);   box-shadow: 0 0 16px var(--red-glow); }
+.tl-light.on-amber  { background: var(--amber);  box-shadow: 0 0 16px var(--amb-glow); }
+.tl-light.on-green  { background: var(--green);  box-shadow: 0 0 16px var(--grn-glow); }
+
+.hero-name { font-size: 22px; font-weight: 700; font-style: italic; }
+.hero-meta { font-size: 13px; color: var(--txt2); font-family: -apple-system, sans-serif; }
+
+/* detail stats */
+.detail-stats {
+  display: flex; gap: 10px;
+  padding: 0 20px 16px;
+}
+.dstat {
+  flex: 1; border-radius: 16px;
+  padding: 14px 8px; text-align: center;
+  border: 1.5px solid; position: relative; overflow: hidden;
+}
+.dstat::before { content: ''; position: absolute; inset: 0; opacity: .08; }
+.dstat.r { border-color: rgba(248,113,113,.35); } .dstat.r::before { background: var(--red); }
+.dstat.a { border-color: rgba(251,191,36,.35);  } .dstat.a::before { background: var(--amber); }
+.dstat.g { border-color: rgba(74,222,128,.35);  } .dstat.g::before { background: var(--green); }
+.dstat-num { font-size: 26px; font-weight: 700; font-style: italic; position: relative; }
+.dstat-lbl { font-size: 10px; font-weight: 700; letter-spacing: 1px; color: var(--txt2); margin-top: 3px; position: relative; font-family: -apple-system, sans-serif; }
+.dstat.r .dstat-num { color: var(--red); }
+.dstat.a .dstat-num { color: var(--amber); }
+.dstat.g .dstat-num { color: var(--green); }
+
+/* ── TOPIC ITEM ── */
+.topic-item {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  margin: 0 20px 10px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  transition: background .12s;
+}
+.topic-body { flex: 1; min-width: 0; }
+.topic-name {
+  font-size: 16px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.topic-note {
+  font-size: 12px; color: var(--txt2); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: -apple-system, sans-serif;
+}
+
+/* traffic light toggle buttons */
+.tl-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.tl-btn {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: transform .15s, box-shadow .2s, border-color .2s, background .2s;
+  flex-shrink: 0;
+}
+.tl-btn:active { transform: scale(.87); }
+.tl-btn.tl-red   { background: var(--red-dim); }
+.tl-btn.tl-amber { background: var(--amb-dim); }
+.tl-btn.tl-green { background: var(--grn-dim); }
+.tl-btn.tl-red.active   { background: var(--red);   border-color: rgba(255,255,255,.5); box-shadow: 0 0 12px var(--red-glow); }
+.tl-btn.tl-amber.active { background: var(--amber);  border-color: rgba(255,255,255,.5); box-shadow: 0 0 12px var(--amb-glow); }
+.tl-btn.tl-green.active { background: var(--green);  border-color: rgba(255,255,255,.5); box-shadow: 0 0 12px var(--grn-glow); }
+.tl-btn-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  transition: background .2s;
+}
+.tl-btn.tl-red   .tl-btn-dot { background: rgba(248,113,113,.5); }
+.tl-btn.tl-amber .tl-btn-dot { background: rgba(251,191,36,.5); }
+.tl-btn.tl-green .tl-btn-dot { background: rgba(74,222,128,.5); }
+.tl-btn.tl-red.active   .tl-btn-dot { background: rgba(0,0,0,.3); }
+.tl-btn.tl-amber.active .tl-btn-dot { background: rgba(0,0,0,.3); }
+.tl-btn.tl-green.active .tl-btn-dot { background: rgba(0,0,0,.3); }
+
+.topic-del {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: none; border: none;
+  color: var(--txt3); font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.topic-del:active { color: var(--red); background: var(--red-dim); }
+
+.add-topic-btn {
+  width: calc(100% - 40px); margin: 0 20px 120px;
+  padding: 14px;
+  background: var(--surf); border: 2px dashed rgba(255,255,255,.1);
+  border-radius: 16px; color: var(--txt2);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.add-topic-btn:active { background: var(--surf2); }
+
+/* ── STATS SCREEN ── */
+.stats-body { padding: 0 16px 32px; }
+.overall-card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: 20px; padding: 20px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.overall-pct {
+  font-size: 72px; font-weight: 700; font-style: italic;
+  color: var(--green); line-height: 1;
+}
+.overall-lbl { font-size: 14px; color: var(--txt2); margin-top: 6px; font-family: -apple-system, sans-serif; }
+.overall-bar {
+  display: flex; height: 10px; border-radius: 99px;
+  overflow: hidden; margin-top: 16px; gap: 2px;
+}
+.bar-seg { height: 100%; border-radius: 99px; transition: width .6s ease; }
+
+.subj-stat-card {
+  background: var(--surf); border: 1px solid var(--border);
+  border-radius: 18px; padding: 16px;
+  margin-bottom: 10px;
+}
+.subj-stat-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.subj-stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.subj-stat-name { flex: 1; font-size: 15px; font-weight: 700; }
+.subj-stat-pct  { font-size: 14px; font-weight: 700; color: var(--green); font-style: italic; }
+.subj-stat-bar  { display: flex; height: 6px; border-radius: 99px; overflow: hidden; gap: 2px; }
+
+/* ── MODALS ── */
+.overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.7);
+  display: flex; align-items: flex-end;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s;
+}
+.overlay.open { opacity: 1; pointer-events: all; }
+.sheet {
+  width: 100%;
+  background: var(--surf);
+  border-radius: 26px 26px 0 0;
+  padding: 12px 20px calc(env(safe-area-inset-bottom,34px) + 20px);
+  transform: translateY(100%);
+  transition: transform .3s cubic-bezier(.34,1.1,.64,1);
+  max-height: 85vh;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.overlay.open .sheet { transform: translateY(0); }
+.handle { width: 40px; height: 4px; background: rgba(255,255,255,.12); border-radius: 99px; margin: 0 auto 20px; }
+.m-title { font-size: 20px; font-weight: 700; font-style: italic; margin-bottom: 20px; }
+.field { margin-bottom: 16px; }
+.field-lbl { font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: var(--txt2); margin-bottom: 8px; font-family: -apple-system, sans-serif; }
+input[type=text], textarea {
+  width: 100%; padding: 14px 16px;
+  background: var(--surf2); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px; color: var(--txt);
+  font-size: 16px; font-family: inherit;
+  -webkit-appearance: none;
+}
+input:focus, textarea:focus { outline: none; border-color: rgba(248,113,113,.5); }
+textarea { resize: none; min-height: 72px; }
+
+/* color picker for subjects */
+.color-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.cpick {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 3px solid transparent; cursor: pointer;
+  transition: border-color .15s, transform .15s;
+}
+.cpick.sel { border-color: #fff; transform: scale(1.12); }
+
+.modal-btn {
+  width: 100%; padding: 16px;
+  border-radius: 16px; font-size: 16px; font-weight: 700;
+  cursor: pointer; margin-top: 8px; font-family: inherit;
+  transition: opacity .1s;
+}
+.modal-btn:active { opacity: .75; }
+.mb-primary { background: linear-gradient(135deg, #F87171, #FBBF24); border: none; color: #000; }
+.mb-danger  { background: var(--red-dim); border: 1px solid rgba(248,113,113,.3); color: var(--red); }
+.mb-plain   { background: var(--surf2); border: 1px solid var(--border); color: var(--txt); }
+
+/* ── INSTALL TIP ── */
+#install-tip {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+  background: var(--surf);
+  border-top: 1px solid var(--border);
+  padding: 16px 20px calc(env(safe-area-inset-bottom,34px) + 12px);
+  display: none;
+}
+#install-tip.show { display: block; }
+.tip-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; font-style: italic; }
+.tip-body  { font-size: 13px; color: var(--txt2); line-height: 1.7; font-family: -apple-system, sans-serif; }
+.tip-close { position: absolute; top: 14px; right: 16px; background: none; border: none; color: var(--txt2); font-size: 22px; cursor: pointer; }
+
+/* ── EMPTY ── */
+.empty { padding: 48px 20px; text-align: center; }
+.empty-icon  { font-size: 44px; margin-bottom: 12px; }
+.empty-title { font-size: 17px; font-weight: 700; font-style: italic; margin-bottom: 6px; }
+.empty-sub   { font-size: 14px; color: var(--txt2); line-height: 1.5; font-family: -apple-system, sans-serif; }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+.anim { animation: fadeUp .26s ease both; }
+
+/* ── PROGRESS BAR (detail screen) ── */
+.prog-row { display: flex; height: 8px; border-radius: 99px; overflow: hidden; gap: 2px; margin: 0 20px 18px; }
+.prog-seg  { height: 100%; border-radius: 99px; transition: width .5s ease; min-width: 3px; }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ HOME ══ -->
+  <div id="screen-home" class="screen active">
+    <div class="hdr">
+      <div class="hdr-title">🚦 <span>Traffic</span> Light</div>
+      <div class="icon-btn" id="btn-new-subj">＋</div>
+    </div>
+    <div class="scroll">
+      <div class="summary-strip" id="global-summary"></div>
+      <div id="home-body"></div>
+    </div>
+  </div>
+
+  <!-- ══ SUBJECT DETAIL ══ -->
+  <div id="screen-detail" class="screen">
+    <div class="hdr">
+      <button class="back-btn" id="btn-back">Subjects</button>
+      <div style="flex:1"></div>
+      <div class="icon-btn" id="btn-subj-opts" style="font-size:17px">⋯</div>
+    </div>
+    <div class="scroll">
+      <div class="subj-hero" id="hero"></div>
+      <div class="detail-stats" id="detail-stats"></div>
+      <div class="prog-row" id="detail-prog"></div>
+      <div class="sec-lbl" style="padding-top:4px">TOPICS</div>
+      <div id="topics-list"></div>
+      <button class="add-topic-btn" id="btn-add-topic">＋ Add Topic</button>
+    </div>
+  </div>
+
+  <!-- ══ STATS ══ -->
+  <div id="screen-stats" class="screen">
+    <div class="hdr">
+      <div class="hdr-title">📊 <span>Overview</span></div>
+    </div>
+    <div class="scroll">
+      <div class="stats-body" id="stats-body"></div>
+    </div>
+  </div>
+
+  <!-- ══ TAB BAR ══ -->
+  <div id="tabbar">
+    <div class="tab active" data-tab="home">
+      <div class="tab-icon">📚</div>
+      <div class="tab-label">Subjects</div>
+    </div>
+    <div class="tab" data-tab="stats">
+      <div class="tab-icon">📊</div>
+      <div class="tab-label">Overview</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ MODALS ══ -->
+
+<!-- New/Edit Subject -->
+<div class="overlay" id="modal-subj">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="m-title" id="msubj-title">New Subject</div>
+    <div class="field">
+      <div class="field-lbl">SUBJECT NAME</div>
+      <input type="text" id="inp-sname" placeholder="e.g. Chemistry, Maths, History" maxlength="40">
+    </div>
+    <div class="field">
+      <div class="field-lbl">COLOUR</div>
+      <div class="color-row" id="color-row"></div>
+    </div>
+    <button class="modal-btn mb-primary" id="btn-save-subj">Create Subject</button>
+  </div>
+</div>
+
+<!-- New Topic -->
+<div class="overlay" id="modal-topic">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="m-title">New Topic</div>
+    <div class="field">
+      <div class="field-lbl">TOPIC NAME</div>
+      <input type="text" id="inp-tname" placeholder="e.g. Photosynthesis, Quadratics…" maxlength="60">
+    </div>
+    <div class="field">
+      <div class="field-lbl">NOTE (OPTIONAL)</div>
+      <input type="text" id="inp-tnote" placeholder="Page refs, exam tip…" maxlength="80">
+    </div>
+    <div class="field">
+      <div class="field-lbl">INITIAL STATUS</div>
+      <div style="display:flex;gap:10px;margin-top:4px" id="initial-status-row">
+        <div class="init-opt" data-v="red"   style="flex:1;padding:12px;border-radius:14px;background:var(--red-dim);border:2px solid transparent;text-align:center;cursor:pointer;transition:all .15s">
+          <div style="font-size:20px">🔴</div><div style="font-size:11px;font-weight:700;color:var(--red);margin-top:4px;font-family:-apple-system,sans-serif">DON'T KNOW</div>
+        </div>
+        <div class="init-opt" data-v="amber" style="flex:1;padding:12px;border-radius:14px;background:var(--amb-dim);border:2px solid transparent;text-align:center;cursor:pointer;transition:all .15s">
+          <div style="font-size:20px">🟡</div><div style="font-size:11px;font-weight:700;color:var(--amber);margin-top:4px;font-family:-apple-system,sans-serif">SHAKY</div>
+        </div>
+        <div class="init-opt" data-v="green" style="flex:1;padding:12px;border-radius:14px;background:var(--grn-dim);border:2px solid transparent;text-align:center;cursor:pointer;transition:all .15s">
+          <div style="font-size:20px">🟢</div><div style="font-size:11px;font-weight:700;color:var(--green);margin-top:4px;font-family:-apple-system,sans-serif">CONFIDENT</div>
+        </div>
+      </div>
+    </div>
+    <button class="modal-btn mb-primary" id="btn-save-topic">Add Topic</button>
+  </div>
+</div>
+
+<!-- Subject Options -->
+<div class="overlay" id="modal-opts">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="m-title" id="opts-name"></div>
+    <button class="modal-btn mb-plain"   id="btn-edit-subj"  style="margin-bottom:10px">✏️  Edit Subject</button>
+    <button class="modal-btn mb-danger"  id="btn-del-subj">🗑  Delete Subject</button>
+  </div>
+</div>
+
+<!-- Install Tip -->
+<div id="install-tip">
+  <button class="tip-close" id="btn-tip-close">×</button>
+  <div class="tip-title">📱 Add to Home Screen</div>
+  <div class="tip-body">
+    Tap <strong>Share ⎋</strong> in Safari → <strong>"Add to Home Screen"</strong> → <strong>Add</strong>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  DATA
+// ══════════════════════════════════════
+const KEY = 'tl_tracker_v1';
+let db;
+try { db = JSON.parse(localStorage.getItem(KEY)) || {}; } catch { db = {}; }
+db.subjects = db.subjects || [];
+
+// Seed data
+if (db.subjects.length === 0) {
+  db.subjects = [
+    { id: uid(), name: 'Chemistry', color: '#60A5FA', created: Date.now(), topics: [
+      { id: uid(), name: 'Atomic Structure', note: 'Ch. 1', status: 'green' },
+      { id: uid(), name: 'Bonding', note: 'Ch. 2', status: 'amber' },
+      { id: uid(), name: 'Moles & Equations', note: 'Ch. 3', status: 'red' },
+      { id: uid(), name: 'Energetics', note: 'Ch. 5', status: 'red' },
+      { id: uid(), name: 'Kinetics', note: 'Ch. 6', status: 'amber' },
+    ]},
+    { id: uid(), name: 'Mathematics', color: '#A78BFA', created: Date.now(), topics: [
+      { id: uid(), name: 'Quadratics', note: '', status: 'green' },
+      { id: uid(), name: 'Trigonometry', note: 'Unit circle', status: 'amber' },
+      { id: uid(), name: 'Integration', note: '', status: 'red' },
+      { id: uid(), name: 'Differentiation', note: '', status: 'green' },
+    ]},
+    { id: uid(), name: 'History', color: '#F472B6', created: Date.now(), topics: [
+      { id: uid(), name: 'WWI Causes', note: 'MAIN acronym', status: 'green' },
+      { id: uid(), name: 'Treaty of Versailles', note: '', status: 'green' },
+      { id: uid(), name: 'Rise of Hitler', note: '', status: 'amber' },
+    ]},
+  ];
+  save();
+}
+
+function save()   { localStorage.setItem(KEY, JSON.stringify(db)); }
+function uid()    { return Math.random().toString(36).slice(2,9) + Date.now().toString(36); }
+function subj(id) { return db.subjects.find(s => s.id === id); }
+function esc(s)   { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function counts(topics) {
+  return {
+    r: topics.filter(t => t.status === 'red').length,
+    a: topics.filter(t => t.status === 'amber').length,
+    g: topics.filter(t => t.status === 'green').length,
+    n: topics.length,
+  };
+}
+
+// ══════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════
+let cur = 'home', activeSubjId = null;
+
+const SCR = {
+  home:   document.getElementById('screen-home'),
+  detail: document.getElementById('screen-detail'),
+  stats:  document.getElementById('screen-stats'),
+};
+const TABBAR = document.getElementById('tabbar');
+
+function show(name) {
+  Object.values(SCR).forEach(s => s.classList.remove('active'));
+  SCR[name].classList.add('active');
+  cur = name;
+  TABBAR.style.display = ['home','stats'].includes(name) ? 'flex' : 'none';
+}
+
+TABBAR.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    TABBAR.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    if (t.dataset.tab === 'home')  { renderHome();  show('home');  }
+    if (t.dataset.tab === 'stats') { renderStats(); show('stats'); }
+  });
+});
+
+// ══════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════
+const COLORS = ['#F87171','#FB923C','#FBBF24','#4ADE80','#34D399','#22D3EE','#60A5FA','#818CF8','#A78BFA','#F472B6'];
+
+function renderHome() {
+  // global summary
+  const allTopics = db.subjects.flatMap(s => s.topics);
+  const gc = counts(allTopics);
+  document.getElementById('global-summary').innerHTML = `
+    <div class="sum-box red-box"><div class="sum-num">${gc.r}</div><div class="sum-lbl">DON'T KNOW</div></div>
+    <div class="sum-box amb-box"><div class="sum-num">${gc.a}</div><div class="sum-lbl">SHAKY</div></div>
+    <div class="sum-box grn-box"><div class="sum-num">${gc.g}</div><div class="sum-lbl">CONFIDENT</div></div>`;
+
+  const body = document.getElementById('home-body');
+  body.innerHTML = '';
+
+  if (db.subjects.length === 0) {
+    body.innerHTML = `<div class="empty">
+      <div class="empty-icon">🚦</div>
+      <div class="empty-title">No subjects yet</div>
+      <div class="empty-sub">Tap + to add your first subject and start tracking your progress.</div>
+    </div>`;
+  } else {
+    const lbl = document.createElement('div');
+    lbl.className = 'sec-lbl'; lbl.textContent = 'SUBJECTS';
+    body.appendChild(lbl);
+
+    db.subjects.forEach((s, i) => {
+      const c = counts(s.topics);
+      const total = c.n || 1;
+      const el = document.createElement('div');
+      el.className = 'subj-card anim';
+      el.style.animationDelay = (i*.055)+'s';
+
+      // dominant light
+      const dominant = c.r > 0 ? 'red' : c.a > 0 ? 'amber' : 'green';
+      const dotColor = dominant === 'red' ? 'var(--red)' : dominant === 'amber' ? 'var(--amber)' : 'var(--green)';
+
+      el.innerHTML = `
+        <div class="subj-top">
+          <div class="subj-dot" style="background:${s.color}"></div>
+          <div class="subj-info">
+            <div class="subj-name">${esc(s.name)}</div>
+            <div class="subj-meta">${c.n} topic${c.n!==1?'s':''} · ${c.r} red · ${c.a} amber · ${c.g} green</div>
+          </div>
+          <div class="subj-count" style="color:${dotColor}">${c.n ? Math.round(c.g/c.n*100) : 0}%</div>
+        </div>
+        <div class="mini-tl">
+          <div class="mini-seg" style="background:var(--red);  flex:${c.r||0.1}"></div>
+          <div class="mini-seg" style="background:var(--amber);flex:${c.a||0.1}"></div>
+          <div class="mini-seg" style="background:var(--green);flex:${c.g||0.1}"></div>
+        </div>`;
+      el.addEventListener('click', () => openDetail(s.id));
+      body.appendChild(el);
+    });
+  }
+
+  // add button
+  const ab = document.createElement('button');
+  ab.className = 'add-subj-btn';
+  ab.innerHTML = '<span style="font-size:18px">+</span> New Subject';
+  ab.addEventListener('click', openNewSubj);
+  body.appendChild(ab);
+}
+
+// ══════════════════════════════════════
+//  DETAIL
+// ══════════════════════════════════════
+function openDetail(id) {
+  activeSubjId = id;
+  const s = subj(id);
+  renderDetail(s);
+  show('detail');
+}
+
+function renderDetail(s) {
+  const c = counts(s.topics);
+  const total = c.n || 1;
+  const pct = Math.round(c.g / total * 100);
+
+  // hero
+  const dominant = c.r > 0 ? 'red' : c.a > 0 ? 'amber' : 'green';
+  document.getElementById('hero').innerHTML = `
+    <div class="tl-visual">
+      <div class="tl-light ${dominant==='red'   ? 'on-red'   : 'off'}"></div>
+      <div class="tl-light ${dominant==='amber' ? 'on-amber' : 'off'}"></div>
+      <div class="tl-light ${dominant==='green' ? 'on-green' : 'off'}"></div>
+    </div>
+    <div class="hero-name">${esc(s.name)}</div>
+    <div class="hero-meta">${c.n} topic${c.n!==1?'s':''} · ${pct}% confident</div>`;
+
+  // stats
+  document.getElementById('detail-stats').innerHTML = `
+    <div class="dstat r"><div class="dstat-num">${c.r}</div><div class="dstat-lbl">DON'T KNOW</div></div>
+    <div class="dstat a"><div class="dstat-num">${c.a}</div><div class="dstat-lbl">SHAKY</div></div>
+    <div class="dstat g"><div class="dstat-num">${c.g}</div><div class="dstat-lbl">CONFIDENT</div></div>`;
+
+  // progress bar
+  document.getElementById('detail-prog').innerHTML = `
+    <div class="prog-seg" style="background:var(--red);  flex:${c.r||0.01}"></div>
+    <div class="prog-seg" style="background:var(--amber);flex:${c.a||0.01}"></div>
+    <div class="prog-seg" style="background:var(--green);flex:${c.g||0.01}"></div>`;
+
+  renderTopics(s);
+}
+
+function renderTopics(s) {
+  const list = document.getElementById('topics-list');
+  list.innerHTML = '';
+  if (s.topics.length === 0) {
+    list.innerHTML = `<div class="empty" style="padding:20px 20px">
+      <div class="empty-icon" style="font-size:32px">📝</div>
+      <div class="empty-title" style="font-size:15px">No topics yet</div>
+      <div class="empty-sub">Add topics and traffic light each one.</div>
+    </div>`;
+    return;
+  }
+
+  // Sort: reds first, then ambers, then greens
+  const order = { red:0, amber:1, green:2 };
+  const sorted = [...s.topics].sort((a,b) => order[a.status] - order[b.status]);
+
+  sorted.forEach(topic => {
+    const el = document.createElement('div');
+    el.className = 'topic-item';
+    el.innerHTML = `
+      <div class="topic-body">
+        <div class="topic-name">${esc(topic.name)}</div>
+        ${topic.note ? `<div class="topic-note">${esc(topic.note)}</div>` : ''}
+      </div>
+      <div class="tl-btns">
+        <div class="tl-btn tl-red   ${topic.status==='red'  ?'active':''}" data-id="${topic.id}" data-s="red"  ><div class="tl-btn-dot"></div></div>
+        <div class="tl-btn tl-amber ${topic.status==='amber'?'active':''}" data-id="${topic.id}" data-s="amber"><div class="tl-btn-dot"></div></div>
+        <div class="tl-btn tl-green ${topic.status==='green'?'active':''}" data-id="${topic.id}" data-s="green"><div class="tl-btn-dot"></div></div>
+      </div>
+      <button class="topic-del" data-id="${topic.id}">✕</button>`;
+
+    // Traffic light buttons
+    el.querySelectorAll('.tl-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        setStatus(s.id, btn.dataset.id, btn.dataset.s);
+      });
+    });
+
+    // Delete
+    el.querySelector('.topic-del').addEventListener('click', e => {
+      e.stopPropagation();
+      deleteTopic(s.id, topic.id);
+    });
+
+    list.appendChild(el);
+  });
+}
+
+function setStatus(subjId, topicId, status) {
+  const s = subj(subjId);
+  const t = s.topics.find(x => x.id === topicId);
+  if (!t) return;
+  t.status = status;
+  save();
+  renderDetail(s);
+  renderHome(); // keep summary in sync
+}
+
+function deleteTopic(subjId, topicId) {
+  const s = subj(subjId);
+  s.topics = s.topics.filter(t => t.id !== topicId);
+  save();
+  renderDetail(s);
+  renderHome();
+}
+
+// ══════════════════════════════════════
+//  STATS
+// ══════════════════════════════════════
+function renderStats() {
+  const body = document.getElementById('stats-body');
+  const all = db.subjects.flatMap(s => s.topics);
+  const gc = counts(all);
+  const total = gc.n || 1;
+  const pct = Math.round(gc.g / total * 100);
+
+  body.innerHTML = `
+    <div class="overall-card">
+      <div class="overall-pct">${pct}%</div>
+      <div class="overall-lbl">of all topics are confident 🟢</div>
+      <div class="overall-bar">
+        <div class="bar-seg" style="background:var(--red);  flex:${gc.r||0.01}"></div>
+        <div class="bar-seg" style="background:var(--amber);flex:${gc.a||0.01}"></div>
+        <div class="bar-seg" style="background:var(--green);flex:${gc.g||0.01}"></div>
+      </div>
+    </div>
+    <div class="sec-lbl">BY SUBJECT</div>
+    <div id="subj-stats"></div>`;
+
+  const ss = body.querySelector('#subj-stats');
+  if (db.subjects.length === 0) {
+    ss.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No data yet</div><div class="empty-sub">Add subjects and topics to see your breakdown here.</div></div>`;
+    return;
+  }
+
+  // Sort by % green ascending (worst first)
+  const sorted = [...db.subjects].sort((a,b) => {
+    const ca = counts(a.topics), cb = counts(b.topics);
+    const pa = ca.n ? ca.g/ca.n : 0, pb = cb.n ? cb.g/cb.n : 0;
+    return pa - pb;
+  });
+
+  sorted.forEach(s => {
+    const c = counts(s.topics);
+    const n = c.n || 1;
+    const p = Math.round(c.g/n*100);
+    const el = document.createElement('div');
+    el.className = 'subj-stat-card';
+    el.innerHTML = `
+      <div class="subj-stat-top">
+        <div class="subj-stat-dot" style="background:${s.color}"></div>
+        <div class="subj-stat-name">${esc(s.name)}</div>
+        <div class="subj-stat-pct" style="color:${c.r>0?'var(--red)':c.a>0?'var(--amber)':'var(--green)'}">${p}%</div>
+      </div>
+      <div class="subj-stat-bar">
+        <div class="bar-seg" style="background:var(--red);  flex:${c.r||0.01}"></div>
+        <div class="bar-seg" style="background:var(--amber);flex:${c.a||0.01}"></div>
+        <div class="bar-seg" style="background:var(--green);flex:${c.g||0.01}"></div>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:10px">
+        <span style="font-size:12px;color:var(--red);  font-weight:700;font-family:-apple-system,sans-serif">🔴 ${c.r}</span>
+        <span style="font-size:12px;color:var(--amber);font-weight:700;font-family:-apple-system,sans-serif">🟡 ${c.a}</span>
+        <span style="font-size:12px;color:var(--green);font-weight:700;font-family:-apple-system,sans-serif">🟢 ${c.g}</span>
+      </div>`;
+    el.addEventListener('click', () => { openDetail(s.id); });
+    ss.appendChild(el);
+  });
+}
+
+// ══════════════════════════════════════
+//  MODALS — SUBJECTS
+// ══════════════════════════════════════
+let selColor = COLORS[5], editSubjId = null;
+
+// Build color picker
+(function() {
+  const cr = document.getElementById('color-row');
+  COLORS.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'cpick' + (c === selColor ? ' sel' : '');
+    el.style.background = c;
+    el.addEventListener('click', () => {
+      selColor = c;
+      cr.querySelectorAll('.cpick').forEach(x => x.classList.remove('sel'));
+      el.classList.add('sel');
+    });
+    cr.appendChild(el);
+  });
+})();
+
+function refreshColorSel() {
+  document.querySelectorAll('.cpick').forEach(el => {
+    el.classList.toggle('sel', el.style.backgroundColor === hexRgb(selColor) || el.style.backgroundColor === selColor);
+  });
+}
+function hexRgb(h) {
+  if (!h.startsWith('#')) return h;
+  const r=parseInt(h.slice(1,3),16),g=parseInt(h.slice(3,5),16),b=parseInt(h.slice(5,7),16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function openOverlay(id)  { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+function openNewSubj() {
+  editSubjId = null; selColor = COLORS[5];
+  document.getElementById('msubj-title').textContent   = 'New Subject';
+  document.getElementById('inp-sname').value            = '';
+  document.getElementById('btn-save-subj').textContent  = 'Create Subject';
+  refreshColorSel();
+  openOverlay('modal-subj');
+  setTimeout(() => document.getElementById('inp-sname').focus(), 360);
+}
+
+function openEditSubj(id) {
+  const s = subj(id);
+  editSubjId = id; selColor = s.color;
+  document.getElementById('msubj-title').textContent   = 'Edit Subject';
+  document.getElementById('inp-sname').value            = s.name;
+  document.getElementById('btn-save-subj').textContent  = 'Save Changes';
+  refreshColorSel();
+  closeOverlay('modal-opts');
+  openOverlay('modal-subj');
+}
+
+document.getElementById('btn-save-subj').addEventListener('click', () => {
+  const name = document.getElementById('inp-sname').value.trim();
+  if (!name) { document.getElementById('inp-sname').focus(); return; }
+  if (editSubjId) {
+    const s = subj(editSubjId); s.name = name; s.color = selColor;
+  } else {
+    db.subjects.push({ id: uid(), name, color: selColor, created: Date.now(), topics: [] });
+  }
+  save(); closeOverlay('modal-subj'); renderHome();
+  if (editSubjId) openDetail(editSubjId);
+});
+
+document.getElementById('btn-new-subj').addEventListener('click', openNewSubj);
+
+// Subject options
+document.getElementById('btn-subj-opts').addEventListener('click', () => {
+  document.getElementById('opts-name').textContent = subj(activeSubjId)?.name || '';
+  openOverlay('modal-opts');
+});
+document.getElementById('btn-edit-subj').addEventListener('click', () => openEditSubj(activeSubjId));
+document.getElementById('btn-del-subj').addEventListener('click', () => {
+  if (!confirm(`Delete "${subj(activeSubjId)?.name}"? This cannot be undone.`)) return;
+  db.subjects = db.subjects.filter(s => s.id !== activeSubjId);
+  save(); closeOverlay('modal-opts'); renderHome(); show('home');
+  TABBAR.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'home'));
+});
+
+// ══════════════════════════════════════
+//  MODALS — TOPICS
+// ══════════════════════════════════════
+let initStatus = 'red';
+
+// Initial status picker
+document.querySelectorAll('.init-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    initStatus = opt.dataset.v;
+    document.querySelectorAll('.init-opt').forEach(x => x.style.borderColor = 'transparent');
+    const borderMap = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
+    opt.style.borderColor = borderMap[initStatus];
+  });
+});
+// Set default selection style
+document.querySelector('.init-opt[data-v="red"]').style.borderColor = 'var(--red)';
+
+document.getElementById('btn-add-topic').addEventListener('click', () => {
+  initStatus = 'red';
+  document.getElementById('inp-tname').value = '';
+  document.getElementById('inp-tnote').value = '';
+  // reset init status UI
+  document.querySelectorAll('.init-opt').forEach(x => x.style.borderColor = 'transparent');
+  document.querySelector('.init-opt[data-v="red"]').style.borderColor = 'var(--red)';
+  openOverlay('modal-topic');
+  setTimeout(() => document.getElementById('inp-tname').focus(), 360);
+});
+
+document.getElementById('btn-save-topic').addEventListener('click', () => {
+  const name = document.getElementById('inp-tname').value.trim();
+  if (!name) { document.getElementById('inp-tname').focus(); return; }
+  const note = document.getElementById('inp-tnote').value.trim();
+  const s = subj(activeSubjId);
+  s.topics.push({ id: uid(), name, note, status: initStatus });
+  save(); closeOverlay('modal-topic');
+  renderDetail(s);
+  renderHome();
+});
+
+// ══════════════════════════════════════
+//  NAV BACK
+// ══════════════════════════════════════
+document.getElementById('btn-back').addEventListener('click', () => {
+  renderHome(); show('home');
+  TABBAR.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'home'));
+});
+
+// ══════════════════════════════════════
+//  INSTALL TIP
+// ══════════════════════════════════════
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.navigator.standalone === true;
+if (isIOS && !isStandalone && !localStorage.getItem('tl_tip_dismissed')) {
+  setTimeout(() => document.getElementById('install-tip').classList.add('show'), 2500);
+}
+document.getElementById('btn-tip-close').addEventListener('click', () => {
+  document.getElementById('install-tip').classList.remove('show');
+  localStorage.setItem('tl_tip_dismissed', '1');
+});
+
+// ══════════════════════════════════════
+//  PREVENT OVERSCROLL
+// ══════════════════════════════════════
+document.addEventListener('touchmove', e => {
+  if (!e.target.closest('.scroll') && !e.target.closest('.sheet')) e.preventDefault();
+}, { passive: false });
+
+// ══════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════
+renderHome();
+</script>
+</body>
+</html>
