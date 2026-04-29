@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,6 +9,15 @@
 <meta name="theme-color" content="#0A0A12">
 <meta name="color-scheme" content="dark">
 <title>FlipCard</title>
+<!-- MathJax for LaTeX rendering -->
+<script>
+MathJax = {
+  tex: { inlineMath: [['$','$'],['\\(','\\)']], displayMath: [['$$','$$'],['\\[','\\]']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea'] },
+  startup: { typeset: false }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%230A0A12'/%3E%3Crect x='28' y='48' width='96' height='68' rx='12' fill='none' stroke='%23FF6B6B' stroke-width='6'/%3E%3Crect x='52' y='66' width='96' height='68' rx='12' fill='%231a1a2e' stroke='%23FF8E53' stroke-width='5'/%3E%3Ctext x='100' y='108' font-family='Arial' font-size='26' font-weight='bold' fill='white' text-anchor='middle'%3EFC%3C/text%3E%3C/svg%3E">
 <style>
 
@@ -593,6 +599,54 @@ textarea { resize: none; min-height: 84px; }
   margin-bottom: 8px;
 }
 
+/* ─── AUDIO ─── */
+.audio-recorder {
+  width: 100%; border-radius: 14px;
+  background: var(--surf2); border: 1px solid var(--border);
+  padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.rec-row { display: flex; align-items: center; gap: 10px; }
+.rec-btn {
+  width: 44px; height: 44px; border-radius: 99px; border: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; cursor: pointer; flex-shrink: 0;
+  transition: transform .1s, background .15s;
+}
+.rec-btn:active { transform: scale(.9); }
+.rec-btn-record { background: rgba(248,113,113,.15); color: var(--red); }
+.rec-btn-record.recording { background: var(--red); color: white; animation: pulse-rec 1s infinite; }
+.rec-btn-play   { background: rgba(74,222,128,.15); color: var(--green); }
+.rec-btn-play.disabled { opacity: .35; pointer-events: none; }
+.rec-btn-clear  { background: rgba(255,255,255,.06); color: var(--txt2); width: 32px; height: 32px; font-size: 15px; }
+.rec-timer { font-size: 13px; font-weight: 700; color: var(--txt2); font-variant-numeric: tabular-nums; }
+.rec-waveform {
+  height: 28px; display: flex; align-items: center; gap: 2px;
+  overflow: hidden; flex: 1;
+}
+.rec-bar {
+  width: 3px; border-radius: 99px; background: var(--accent);
+  opacity: .5; transition: height .1s;
+  min-height: 3px;
+}
+.rec-status { font-size: 11px; color: var(--txt2); }
+@keyframes pulse-rec { 0%,100% { box-shadow: 0 0 0 0 rgba(248,113,113,.4); } 50% { box-shadow: 0 0 0 8px rgba(248,113,113,0); } }
+
+/* Audio playback on card face */
+.card-audio-btn {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 99px; padding: 8px 16px;
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--txt);
+  border: none; margin-top: 10px;
+  transition: background .15s;
+}
+.card-audio-btn:active { background: rgba(255,255,255,.14); }
+.card-audio-btn.playing { color: var(--green); }
+
+/* MathJax override for dark theme */
+.MJX-TEX, mjx-container { color: inherit !important; }
+mjx-container { display: inline !important; }
+
 /* ─── ANIMATIONS ─── */
 @keyframes fadeUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
 .anim { animation: fadeUp .28s ease both; }
@@ -687,7 +741,7 @@ textarea { resize: none; min-height: 84px; }
         </div>
         <div class="face back">
           <div class="face-lbl">ANSWER</div>
-          <div class="face-body"><div class="face-text" id="back-txt"></div></div>
+          <div class="face-body" id="back-body"><div class="face-text" id="back-txt"></div></div>
           <div id="hint-chip" class="hint-chip" style="display:none">
             <span>💡</span><span class="hint-text" id="hint-txt"></span>
           </div>
@@ -805,12 +859,25 @@ textarea { resize: none; min-height: 84px; }
       <input type="file" id="inp-img" accept="image/*" style="display:none">
     </div>
     <div class="field">
-      <div class="field-lbl">FRONT — QUESTION</div>
-      <textarea id="inp-front" placeholder="What do you want to remember? (optional if image set)"></textarea>
+      <div class="field-lbl">AUDIO (OPTIONAL)</div>
+      <div class="audio-recorder" id="audio-recorder">
+        <div class="rec-row">
+          <button class="rec-btn rec-btn-record" id="rec-btn-record" title="Record">🎙</button>
+          <button class="rec-btn rec-btn-play disabled" id="rec-btn-play" title="Play">▶️</button>
+          <div class="rec-waveform" id="rec-waveform"></div>
+          <div class="rec-timer" id="rec-timer">0:00</div>
+          <button class="rec-btn rec-btn-clear" id="rec-btn-clear" title="Clear">✕</button>
+        </div>
+        <div class="rec-status" id="rec-status">Tap 🎙 to record — plays automatically on the answer card</div>
+      </div>
     </div>
     <div class="field">
-      <div class="field-lbl">BACK — ANSWER</div>
-      <textarea id="inp-back"  placeholder="The answer..."></textarea>
+      <div class="field-lbl">FRONT — QUESTION <span style="opacity:.5;font-size:10px">supports $LaTeX$</span></div>
+      <textarea id="inp-front" placeholder="What do you want to remember? (optional if image set)&#10;&#10;Use $x^2$ for inline maths or $$\frac{a}{b}$$ for display maths"></textarea>
+    </div>
+    <div class="field">
+      <div class="field-lbl">BACK — ANSWER <span style="opacity:.5;font-size:10px">supports $LaTeX$</span></div>
+      <textarea id="inp-back"  placeholder="The answer... supports $LaTeX$ too"></textarea>
     </div>
     <div class="field">
       <div class="field-lbl">HINT (OPTIONAL)</div>
@@ -1370,7 +1437,11 @@ function openEditCard(deckId, i) {
   const c = d.cards[i];
   editCardIdx = i;
   pendingImage = c.image || null;
+  pendingAudio = c.audio || null;
   setImagePreview(pendingImage);
+  // Reset recorder UI then show existing audio if present
+  resetRecorder();
+  if (pendingAudio) setAudioPreview(pendingAudio);
   document.getElementById('mcard-title').textContent   = 'Edit Card';
   document.getElementById('inp-front').value           = c.front;
   document.getElementById('inp-back').value            = c.back;
@@ -1423,7 +1494,6 @@ function renderStudyCard() {
   if (card.image) {
     frontBody.classList.add('has-img');
     frontTxt.textContent = card.front || '';
-    // Remove old img if present
     const old = frontBody.querySelector('.face-img');
     if (old) old.remove();
     const img = document.createElement('img');
@@ -1438,14 +1508,42 @@ function renderStudyCard() {
     frontTxt.textContent = card.front;
   }
 
-  document.getElementById('back-txt').textContent  = card.back;
+  // Back face — text + audio button
+  const backBody = document.getElementById('back-body');
+  const backTxt  = document.getElementById('back-txt');
+  backTxt.textContent = card.back;
+  // Remove old audio btn
+  const oldAudioBtn = backBody.querySelector('.card-audio-btn');
+  if (oldAudioBtn) oldAudioBtn.remove();
+  if (card.audio) {
+    const audioBtn = document.createElement('button');
+    audioBtn.className = 'card-audio-btn';
+    audioBtn.innerHTML = '🔊 Play Audio';
+    let activeAudio = null;
+    audioBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (activeAudio) { activeAudio.pause(); activeAudio = null; audioBtn.innerHTML = '🔊 Play Audio'; audioBtn.classList.remove('playing'); return; }
+      activeAudio = new Audio(card.audio);
+      audioBtn.innerHTML = '⏸ Playing…';
+      audioBtn.classList.add('playing');
+      activeAudio.onended = () => { audioBtn.innerHTML = '🔊 Play Audio'; audioBtn.classList.remove('playing'); activeAudio = null; };
+      activeAudio.play();
+    });
+    backBody.appendChild(audioBtn);
+  }
+
   const hc = document.getElementById('hint-chip');
   if (card.hint) { hc.style.display='flex'; document.getElementById('hint-txt').textContent = card.hint; }
   else { hc.style.display='none'; }
+
   document.getElementById('flipper').classList.remove('flipped');
   studyState.flipped = false;
   document.getElementById('reveal-wrap').style.display = 'block';
   document.getElementById('grade-row').style.display   = 'none';
+
+  // Render MathJax on both faces
+  renderMath(document.getElementById('front-body'));
+  renderMath(backBody);
 
   // Enable/disable back button
   const prevBtn = document.getElementById('btn-prev-card');
@@ -1467,7 +1565,10 @@ function flip() {
   document.getElementById('flipper').classList.toggle('flipped', studyState.flipped);
   document.getElementById('reveal-wrap').style.display = studyState.flipped ? 'none'  : 'block';
   document.getElementById('grade-row').style.display   = studyState.flipped ? 'flex'  : 'none';
-  if (studyState.flipped) showIntervalPreviews(studyState.queue[studyState.index]);
+  if (studyState.flipped) {
+    showIntervalPreviews(studyState.queue[studyState.index]);
+    renderMath(document.querySelector('.face.back'));
+  }
 }
 
 function grade(g) {
@@ -1745,6 +1846,141 @@ document.getElementById('btn-save-deck').addEventListener('click', () => {
   newDeckParentId = null;
 });
 
+// ═══════════════════════════════════════════
+//  MATHJAX
+// ═══════════════════════════════════════════
+function renderMath(el) {
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([el]).catch(() => {});
+  }
+}
+
+// ═══════════════════════════════════════════
+//  AUDIO RECORDER
+// ═══════════════════════════════════════════
+let mediaRecorder = null;
+let audioChunks   = [];
+let pendingAudio  = null; // base64 data URL
+let recTimerInt   = null;
+let recSeconds    = 0;
+let recStream     = null;
+let audioAnalyser = null;
+let waveAnimFrame = null;
+let playingAudio  = null;
+
+function resetRecorder() {
+  pendingAudio = null;
+  recSeconds   = 0;
+  clearInterval(recTimerInt);
+  cancelAnimationFrame(waveAnimFrame);
+  if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  document.getElementById('rec-timer').textContent    = '0:00';
+  document.getElementById('rec-status').textContent   = 'Tap 🎙 to record — plays automatically on the answer card';
+  document.getElementById('rec-btn-record').classList.remove('recording');
+  document.getElementById('rec-btn-record').textContent = '🎙';
+  document.getElementById('rec-btn-play').classList.add('disabled');
+  document.getElementById('rec-waveform').innerHTML   = '';
+}
+
+function setAudioPreview(dataUrl) {
+  pendingAudio = dataUrl;
+  document.getElementById('rec-btn-play').classList.remove('disabled');
+  document.getElementById('rec-status').textContent = '✓ Audio recorded — tap ▶ to preview';
+}
+
+function drawWaveform(analyser) {
+  const wrap = document.getElementById('rec-waveform');
+  // Build bars once
+  if (!wrap.children.length) {
+    for (let i = 0; i < 28; i++) {
+      const b = document.createElement('div');
+      b.className = 'rec-bar';
+      b.style.height = '3px';
+      wrap.appendChild(b);
+    }
+  }
+  const bars = wrap.children;
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  function frame() {
+    waveAnimFrame = requestAnimationFrame(frame);
+    analyser.getByteFrequencyData(data);
+    const step = Math.floor(data.length / bars.length);
+    for (let i = 0; i < bars.length; i++) {
+      const val = data[i * step] / 255;
+      bars[i].style.height = Math.max(3, val * 26) + 'px';
+      bars[i].style.opacity = 0.4 + val * 0.6;
+    }
+  }
+  frame();
+}
+
+document.getElementById('rec-btn-record').addEventListener('click', async () => {
+  const btn = document.getElementById('rec-btn-record');
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    // Stop recording
+    mediaRecorder.stop();
+    return;
+  }
+
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaStreamSource(recStream);
+    audioAnalyser = ctx.createAnalyser();
+    audioAnalyser.fftSize = 64;
+    src.connect(audioAnalyser);
+
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(recStream);
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      cancelAnimationFrame(waveAnimFrame);
+      clearInterval(recTimerInt);
+      recStream.getTracks().forEach(t => t.stop());
+      recStream = null;
+      btn.classList.remove('recording');
+      btn.textContent = '🎙';
+      const blob   = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+      const reader = new FileReader();
+      reader.onload = ev => setAudioPreview(ev.target.result);
+      reader.readAsDataURL(blob);
+    };
+
+    mediaRecorder.start();
+    btn.classList.add('recording');
+    btn.textContent = '⏹';
+    recSeconds = 0;
+    document.getElementById('rec-status').textContent = 'Recording…';
+    drawWaveform(audioAnalyser);
+    recTimerInt = setInterval(() => {
+      recSeconds++;
+      const m = Math.floor(recSeconds / 60);
+      const s = String(recSeconds % 60).padStart(2,'0');
+      document.getElementById('rec-timer').textContent = `${m}:${s}`;
+      if (recSeconds >= 120) mediaRecorder.stop(); // 2 min max
+    }, 1000);
+  } catch {
+    document.getElementById('rec-status').textContent = '⚠️ Microphone access denied';
+  }
+});
+
+document.getElementById('rec-btn-play').addEventListener('click', () => {
+  if (!pendingAudio) return;
+  const btn = document.getElementById('rec-btn-play');
+  if (playingAudio) { playingAudio.pause(); playingAudio = null; btn.textContent = '▶️'; return; }
+  playingAudio = new Audio(pendingAudio);
+  btn.textContent = '⏸';
+  playingAudio.onended = () => { btn.textContent = '▶️'; playingAudio = null; };
+  playingAudio.play();
+});
+
+document.getElementById('rec-btn-clear').addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+  if (playingAudio) { playingAudio.pause(); playingAudio = null; }
+  resetRecorder();
+});
+
 // ── Image upload handling ──
 let pendingImage = null; // base64 string or null
 
@@ -1873,7 +2109,9 @@ document.getElementById('btn-close-preview').addEventListener('click', () => {
 document.getElementById('btn-add-card').addEventListener('click', () => {
   editCardIdx = null;
   pendingImage = null;
+  pendingAudio = null;
   setImagePreview(null);
+  resetRecorder();
   document.getElementById('mcard-title').textContent   = 'New Card';
   document.getElementById('inp-front').value           = '';
   document.getElementById('inp-back').value            = '';
@@ -1891,11 +2129,17 @@ document.getElementById('btn-save-card').addEventListener('click', () => {
   if (!back)  { document.getElementById('inp-back').focus(); return; }
   const d = deck(activeDeckId);
   if (editCardIdx !== null) {
-    d.cards[editCardIdx] = { ...d.cards[editCardIdx], front, back, hint, image: pendingImage || null };
+    d.cards[editCardIdx] = { ...d.cards[editCardIdx], front, back, hint,
+      image: pendingImage || null,
+      audio: pendingAudio  || null };
   } else {
-    d.cards.push({ id: uid(), front, back, hint, image: pendingImage || null, srs: { interval: 0, ef: 2.5, reps: 0, due: Date.now() } });
+    d.cards.push({ id: uid(), front, back, hint,
+      image: pendingImage || null,
+      audio: pendingAudio  || null,
+      srs: { interval: 0, ef: 2.5, reps: 0, due: Date.now() } });
   }
   pendingImage = null;
+  pendingAudio = null;
   save(); closeOverlay('modal-card');
   openDeck(activeDeckId);
 });
@@ -2013,20 +2257,20 @@ function readCSVFile(file) {
 
 function previewImport() {
   const rows = parseCSV(importTA.value);
-  // Skip header row if present
   const dataRows = rows.filter(r => r[0] && r[1] && r[0].toLowerCase() !== 'front');
   const valid = dataRows.filter(r => r[0] && r[1]);
-  const hasDecks = valid.some(r => r[3] && r[3].trim());
+  const hasDecks  = valid.some(r => r[3] && r[3].trim());
+  const hasImages = valid.some(r => r[4] && r[4].trim().startsWith('data:'));
   const fb = document.getElementById('import-feedback');
   if (!valid.length) {
     fb.textContent = 'No valid rows detected yet.';
     fb.style.color = 'var(--txt3)';
   } else if (hasDecks) {
     const deckNames = [...new Set(valid.map(r => r[3]).filter(Boolean))];
-    fb.textContent = `✓ ${valid.length} cards across ${deckNames.length} subdeck${deckNames.length!==1?'s':''}: ${deckNames.join(', ')}`;
+    fb.textContent = `✓ ${valid.length} cards across ${deckNames.length} subdeck${deckNames.length!==1?'s':''}${hasImages?' · includes images':''}`;
     fb.style.color = 'var(--green)';
   } else {
-    fb.textContent = `✓ ${valid.length} card${valid.length!==1?'s':''} ready to import`;
+    fb.textContent = `✓ ${valid.length} card${valid.length!==1?'s':''}${hasImages?' · includes images':''} ready to import`;
     fb.style.color = 'var(--green)';
   }
 }
@@ -2049,19 +2293,21 @@ document.getElementById('btn-do-import').addEventListener('click', () => {
   // Group cards by subdeck name (col 4), empty = goes into parent deck
   const groups = {};
   valid.forEach(row => {
-    const [front, back, hint = '', subdeckName = ''] = row;
+    const front       = row[0] || '';
+    const back        = row[1] || '';
+    const hint        = row[2] || '';
+    const subdeckName = row[3] || '';
+    const image       = row[4] && row[4].startsWith('data:') ? row[4] : null;
     const key = subdeckName.trim();
     if (!groups[key]) groups[key] = [];
-    groups[key].push({ front, back, hint: hint || '' });
+    groups[key].push({ front, back, hint, image });
   });
 
   Object.entries(groups).forEach(([subdeckName, cards]) => {
     let targetDeck;
     if (!subdeckName) {
-      // No subdeck column — import straight into parent
       targetDeck = parentDeck;
     } else {
-      // Find or create subdeck with this name under activeDeckId
       targetDeck = db.decks.find(d => d.parentId === activeDeckId &&
         d.name.toLowerCase() === subdeckName.toLowerCase());
       if (!targetDeck) {
@@ -2074,13 +2320,14 @@ document.getElementById('btn-do-import').addEventListener('click', () => {
       }
     }
 
-    cards.forEach(({ front, back, hint }) => {
+    cards.forEach(({ front, back, hint, image }) => {
       const exists = targetDeck.cards.some(
         c => c.front.toLowerCase() === front.toLowerCase() &&
              c.back.toLowerCase()  === back.toLowerCase()
       );
       if (!exists) {
         targetDeck.cards.push({ id: uid(), front, back, hint,
+          image: image || null, audio: null,
           srs: { interval: 0, ef: 2.5, reps: 0, due: now } });
         added++;
       } else { skipped++; }
