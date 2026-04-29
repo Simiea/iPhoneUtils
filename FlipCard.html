@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -968,14 +965,25 @@ mjx-container { display: inline !important; }
     <div class="handle"></div>
     <div class="modal-title">Import Cards</div>
     <div style="font-size:13px;color:var(--txt2);margin-bottom:16px;line-height:1.6">
-      Paste CSV below, or drop a <strong>.csv</strong> file. One card per line:<br>
-      <code style="font-size:12px;color:var(--accent)">front, back, hint (optional), subdeck (optional)</code><br><br>
-      If a <strong>subdeck</strong> name is provided, cards will be automatically sorted into subdecks under this deck.
+      Drop a <strong>.csv</strong> file or tap to choose one. Columns:<br>
+      <code style="font-size:12px;color:var(--accent)">front, back, hint, subdeck, image (optional)</code>
     </div>
-    <div class="field">
-      <div class="field-lbl">CSV DATA</div>
-      <textarea id="inp-import-csv" placeholder="Mitosis, Cell division producing 2 identical cells, MI = mirror&#10;ATP, Adenosine Triphosphate — energy currency&#10;Osmosis, Water across a semipermeable membrane" style="min-height:160px;font-size:13px;font-family:monospace"></textarea>
+    <!-- File drop zone -->
+    <div id="import-dropzone" style="
+      width:100%;min-height:90px;border:2px dashed rgba(255,255,255,.12);
+      border-radius:14px;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;gap:6px;cursor:pointer;padding:20px;margin-bottom:14px;
+      transition:border-color .15s,background .15s;text-align:center;
+    ">
+      <div style="font-size:28px">📂</div>
+      <div style="font-size:13px;font-weight:700;color:var(--txt)">Tap to choose a CSV file</div>
+      <div style="font-size:11px;color:var(--txt3)">or drag and drop here</div>
     </div>
+    <!-- Paste fallback -->
+    <details style="margin-bottom:12px">
+      <summary style="font-size:12px;color:var(--txt2);cursor:pointer;padding:4px 0">Or paste CSV text manually ▾</summary>
+      <textarea id="inp-import-csv" placeholder="front, back, hint&#10;Mitosis, Cell division producing 2 identical cells" style="min-height:100px;font-size:12px;font-family:monospace;margin-top:8px"></textarea>
+    </details>
     <div id="import-feedback" style="font-size:13px;margin-bottom:12px;min-height:18px"></div>
     <button class="modal-btn mbtn-primary" id="btn-do-import">Import Cards</button>
     <button class="modal-btn mbtn-plain"   id="btn-cancel-import" style="margin-top:10px">Cancel</button>
@@ -2174,25 +2182,47 @@ document.getElementById('btn-del-deck').addEventListener('click', () => {
 //  IMPORT / EXPORT
 // ═══════════════════════════════════════════
 
-// ── CSV helpers ──
+// ── CSV Parser (handles large base64 image fields) ──
 function parseCSV(text) {
-  // Handle quoted fields, commas inside quotes, escaped quotes
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  return lines.map(line => {
-    const fields = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (ch === ',' && !inQ) {
-        fields.push(cur.trim()); cur = '';
-      } else { cur += ch; }
+  const rows = [];
+  let i = 0;
+  const len = text.length;
+
+  while (i < len) {
+    // Skip \r\n or \n between rows
+    if (text[i] === '\r') i++;
+    if (i < len && text[i] === '\n') i++;
+    if (i >= len) break;
+
+    const row = [];
+    while (i < len && text[i] !== '\n' && text[i] !== '\r') {
+      let field = '';
+      if (text[i] === '"') {
+        // Quoted field
+        i++; // skip opening quote
+        while (i < len) {
+          if (text[i] === '"') {
+            if (i + 1 < len && text[i+1] === '"') {
+              field += '"'; i += 2; // escaped quote
+            } else {
+              i++; break; // closing quote
+            }
+          } else {
+            field += text[i++];
+          }
+        }
+      } else {
+        // Unquoted field — read until comma or newline
+        while (i < len && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') {
+          field += text[i++];
+        }
+      }
+      row.push(field.trim());
+      if (i < len && text[i] === ',') i++; // skip comma
     }
-    fields.push(cur.trim());
-    return fields;
-  });
+    if (row.some(f => f)) rows.push(row);
+  }
+  return rows;
 }
 
 function toCSV(cards) {
@@ -2222,27 +2252,48 @@ document.getElementById('btn-export-deck').addEventListener('click', () => {
 // ── Import — open sheet ──
 document.getElementById('btn-import-deck').addEventListener('click', () => {
   closeOverlay('modal-opts');
+  importCSVText = '';
   document.getElementById('inp-import-csv').value = '';
   document.getElementById('import-feedback').textContent = '';
   document.getElementById('import-feedback').style.color = '';
+  document.getElementById('import-dropzone').innerHTML = `<div style="font-size:28px">📂</div><div style="font-size:13px;font-weight:700;color:var(--txt)">Tap to choose a CSV file</div><div style="font-size:11px;color:var(--txt3)">or drag and drop here</div>`;
   setTimeout(() => openOverlay('modal-import'), 260);
 });
 
-// Allow dragging a .csv file onto the textarea
+// ── CSV Import wiring ──
+let importCSVText = '';
+
 const importTA = document.getElementById('inp-import-csv');
-importTA.addEventListener('dragover', e => { e.preventDefault(); importTA.style.borderColor = 'var(--accent)'; });
-importTA.addEventListener('dragleave', () => { importTA.style.borderColor = ''; });
-importTA.addEventListener('drop', e => {
-  e.preventDefault(); importTA.style.borderColor = '';
+
+// Dropzone — tap to pick file
+document.getElementById('import-dropzone').addEventListener('click', () => {
+  document.getElementById('file-csv-input').click();
+});
+
+// Drag over dropzone
+const dz = document.getElementById('import-dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'rgba(255,107,107,.06)'; });
+dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; dz.style.background = ''; });
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.style.borderColor = ''; dz.style.background = '';
   const file = e.dataTransfer.files[0];
   if (file) readCSVFile(file);
 });
 
-// Also allow tapping to pick a file on mobile
-importTA.addEventListener('click', (e) => {
-  // Only trigger file picker if textarea is empty (avoid interfering with typing)
-  if (!importTA.value.trim()) document.getElementById('file-csv-input').click();
+// Also allow dragging onto textarea
+importTA.addEventListener('dragover', e => { e.preventDefault(); });
+importTA.addEventListener('drop', e => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) readCSVFile(file);
 });
+
+// Textarea manual input
+importTA.addEventListener('input', () => {
+  importCSVText = importTA.value;
+  previewImport();
+});
+
 document.getElementById('file-csv-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (file) readCSVFile(file);
@@ -2252,14 +2303,18 @@ document.getElementById('file-csv-input').addEventListener('change', e => {
 function readCSVFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
-    importTA.value = ev.target.result;
+    importCSVText = ev.target.result;
+    // Show file loaded in dropzone
+    dz.innerHTML = `<div style="font-size:22px">✅</div><div style="font-size:13px;font-weight:700;color:var(--green)">${file.name}</div><div style="font-size:11px;color:var(--txt3)">${(file.size/1024).toFixed(0)} KB loaded</div>`;
     previewImport();
   };
   reader.readAsText(file);
 }
 
 function previewImport() {
-  const rows = parseCSV(importTA.value);
+  const text = importCSVText || importTA.value;
+  if (!text.trim()) return;
+  const rows = parseCSV(text);
   const dataRows = rows.filter(r => r[0] && r[1] && r[0].toLowerCase() !== 'front');
   const valid = dataRows.filter(r => r[0] && r[1]);
   const hasDecks  = valid.some(r => r[3] && r[3].trim());
@@ -2280,11 +2335,12 @@ function previewImport() {
 importTA.addEventListener('input', previewImport);
 
 document.getElementById('btn-do-import').addEventListener('click', () => {
-  const rows  = parseCSV(importTA.value);
+  const text = importCSVText || importTA.value;
+  const rows  = parseCSV(text);
   const valid = rows.filter(r => r[0] && r[1] && r[0].toLowerCase() !== 'front');
   if (!valid.length) {
     const fb = document.getElementById('import-feedback');
-    fb.textContent = 'Nothing to import — check your CSV format.';
+    fb.textContent = 'Nothing to import — choose a CSV file first.';
     fb.style.color = 'var(--red)';
     return;
   }
@@ -2293,7 +2349,6 @@ document.getElementById('btn-do-import').addEventListener('click', () => {
   const parentDeck = deck(activeDeckId);
   let added = 0, skipped = 0;
 
-  // Group cards by subdeck name (col 4), empty = goes into parent deck
   const groups = {};
   valid.forEach(row => {
     const front       = row[0] || '';
@@ -2337,6 +2392,7 @@ document.getElementById('btn-do-import').addEventListener('click', () => {
     });
   });
 
+  importCSVText = '';
   save();
   closeOverlay('modal-import');
   openDeck(activeDeckId);
