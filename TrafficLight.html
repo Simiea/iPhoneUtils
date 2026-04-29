@@ -331,6 +331,14 @@ html, body {
 .tl-btn.tl-amber.active .tl-btn-dot { background: rgba(0,0,0,.3); }
 .tl-btn.tl-green.active .tl-btn-dot { background: rgba(0,0,0,.3); }
 
+.topic-edit {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: none; border: none;
+  color: var(--txt2); font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.topic-edit:active { color: var(--amber); background: var(--amb-dim); }
 .topic-del {
   width: 28px; height: 28px; border-radius: 8px;
   background: none; border: none;
@@ -555,7 +563,7 @@ textarea { resize: none; min-height: 72px; }
 <div class="overlay" id="modal-topic">
   <div class="sheet">
     <div class="handle"></div>
-    <div class="m-title">New Topic</div>
+    <div class="m-title" id="mtopic-title">New Topic</div>
     <div class="field">
       <div class="field-lbl">TOPIC NAME</div>
       <input type="text" id="inp-tname" placeholder="e.g. Photosynthesis, Quadratics…" maxlength="60">
@@ -813,7 +821,8 @@ function renderTopics(s) {
         <div class="tl-btn tl-amber ${topic.status==='amber'?'active':''}" data-id="${topic.id}" data-s="amber"><div class="tl-btn-dot"></div></div>
         <div class="tl-btn tl-green ${topic.status==='green'?'active':''}" data-id="${topic.id}" data-s="green"><div class="tl-btn-dot"></div></div>
       </div>
-      <button class="topic-del" data-id="${topic.id}">✕</button>`;
+      <button class="topic-edit" data-id="${topic.id}" title="Edit">✎</button>
+      <button class="topic-del"  data-id="${topic.id}" title="Delete">✕</button>`;
 
     // Traffic light buttons
     el.querySelectorAll('.tl-btn').forEach(btn => {
@@ -821,6 +830,12 @@ function renderTopics(s) {
         e.stopPropagation();
         setStatus(s.id, btn.dataset.id, btn.dataset.s);
       });
+    });
+
+    // Edit
+    el.querySelector('.topic-edit').addEventListener('click', e => {
+      e.stopPropagation();
+      openEditTopic(s.id, topic.id);
     });
 
     // Delete
@@ -1003,37 +1018,56 @@ document.getElementById('btn-del-subj').addEventListener('click', () => {
 // ══════════════════════════════════════
 //  MODALS — TOPICS
 // ══════════════════════════════════════
-let initStatus = 'red';
+let initStatus = 'red', editTopicId = null;
+
+function setInitStatus(val) {
+  initStatus = val;
+  document.querySelectorAll('.init-opt').forEach(x => x.style.borderColor = 'transparent');
+  const borderMap = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
+  document.querySelector(`.init-opt[data-v="${val}"]`).style.borderColor = borderMap[val];
+}
 
 // Initial status picker
 document.querySelectorAll('.init-opt').forEach(opt => {
-  opt.addEventListener('click', () => {
-    initStatus = opt.dataset.v;
-    document.querySelectorAll('.init-opt').forEach(x => x.style.borderColor = 'transparent');
-    const borderMap = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)' };
-    opt.style.borderColor = borderMap[initStatus];
-  });
+  opt.addEventListener('click', () => setInitStatus(opt.dataset.v));
 });
-// Set default selection style
-document.querySelector('.init-opt[data-v="red"]').style.borderColor = 'var(--red)';
+setInitStatus('red');
 
 document.getElementById('btn-add-topic').addEventListener('click', () => {
-  initStatus = 'red';
+  editTopicId = null;
+  document.getElementById('mtopic-title').textContent  = 'New Topic';
+  document.getElementById('btn-save-topic').textContent = 'Add Topic';
   document.getElementById('inp-tname').value = '';
   document.getElementById('inp-tnote').value = '';
-  // reset init status UI
-  document.querySelectorAll('.init-opt').forEach(x => x.style.borderColor = 'transparent');
-  document.querySelector('.init-opt[data-v="red"]').style.borderColor = 'var(--red)';
+  setInitStatus('red');
   openOverlay('modal-topic');
   setTimeout(() => document.getElementById('inp-tname').focus(), 360);
 });
+
+function openEditTopic(subjId, topicId) {
+  const s = subj(subjId);
+  const t = s.topics.find(x => x.id === topicId);
+  editTopicId = topicId;
+  document.getElementById('mtopic-title').textContent  = 'Edit Topic';
+  document.getElementById('btn-save-topic').textContent = 'Save Changes';
+  document.getElementById('inp-tname').value = t.name;
+  document.getElementById('inp-tnote').value = t.note || '';
+  setInitStatus(t.status);
+  openOverlay('modal-topic');
+  setTimeout(() => document.getElementById('inp-tname').focus(), 360);
+}
 
 document.getElementById('btn-save-topic').addEventListener('click', () => {
   const name = document.getElementById('inp-tname').value.trim();
   if (!name) { document.getElementById('inp-tname').focus(); return; }
   const note = document.getElementById('inp-tnote').value.trim();
   const s = subj(activeSubjId);
-  s.topics.push({ id: uid(), name, note, status: initStatus });
+  if (editTopicId) {
+    const t = s.topics.find(x => x.id === editTopicId);
+    t.name = name; t.note = note; t.status = initStatus;
+  } else {
+    s.topics.push({ id: uid(), name, note, status: initStatus });
+  }
   save(); closeOverlay('modal-topic');
   renderDetail(s);
   renderHome();
