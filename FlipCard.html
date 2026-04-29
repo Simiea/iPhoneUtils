@@ -2249,29 +2249,30 @@ document.getElementById('btn-export-deck').addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
-// ── Import — open sheet ──
-document.getElementById('btn-import-deck').addEventListener('click', () => {
-  closeOverlay('modal-opts');
-  importCSVText = '';
-  document.getElementById('inp-import-csv').value = '';
-  document.getElementById('import-feedback').textContent = '';
-  document.getElementById('import-feedback').style.color = '';
-  document.getElementById('import-dropzone').innerHTML = `<div style="font-size:28px">📂</div><div style="font-size:13px;font-weight:700;color:var(--txt)">Tap to choose a CSV file</div><div style="font-size:11px;color:var(--txt3)">or drag and drop here</div>`;
-  setTimeout(() => openOverlay('modal-import'), 260);
-});
-
 // ── CSV Import wiring ──
 let importCSVText = '';
 
 const importTA = document.getElementById('inp-import-csv');
+const dz = document.getElementById('import-dropzone');
 
-// Dropzone — tap to pick file
-document.getElementById('import-dropzone').addEventListener('click', () => {
-  document.getElementById('file-csv-input').click();
+function resetImportModal() {
+  importCSVText = '';
+  importTA.value = '';
+  document.getElementById('import-feedback').textContent = '';
+  document.getElementById('import-feedback').style.color = '';
+  dz.innerHTML = `<div style="font-size:28px">📂</div><div style="font-size:13px;font-weight:700;color:var(--txt)">Tap to choose a CSV file</div><div style="font-size:11px;color:var(--txt3)">or drag and drop here</div>`;
+}
+
+document.getElementById('btn-import-deck').addEventListener('click', () => {
+  closeOverlay('modal-opts');
+  resetImportModal();
+  setTimeout(() => openOverlay('modal-import'), 260);
 });
 
-// Drag over dropzone
-const dz = document.getElementById('import-dropzone');
+// Dropzone tap → file picker
+dz.addEventListener('click', () => document.getElementById('file-csv-input').click());
+
+// Drag onto dropzone
 dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--accent)'; dz.style.background = 'rgba(255,107,107,.06)'; });
 dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; dz.style.background = ''; });
 dz.addEventListener('drop', e => {
@@ -2280,33 +2281,31 @@ dz.addEventListener('drop', e => {
   if (file) readCSVFile(file);
 });
 
-// Also allow dragging onto textarea
-importTA.addEventListener('dragover', e => { e.preventDefault(); });
-importTA.addEventListener('drop', e => {
-  e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (file) readCSVFile(file);
-});
-
-// Textarea manual input
+// Textarea manual paste (only updates importCSVText, doesn't overwrite file data)
 importTA.addEventListener('input', () => {
-  importCSVText = importTA.value;
-  previewImport();
+  if (importTA.value.trim()) {
+    importCSVText = importTA.value;
+    previewImport();
+  }
 });
 
+// File input change (iOS Safari triggers this)
 document.getElementById('file-csv-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (file) readCSVFile(file);
-  e.target.value = '';
+  e.target.value = ''; // reset so same file can be re-selected
 });
 
 function readCSVFile(file) {
   const reader = new FileReader();
   reader.onload = ev => {
-    importCSVText = ev.target.result;
-    // Show file loaded in dropzone
+    importCSVText = ev.target.result; // store in closure variable
     dz.innerHTML = `<div style="font-size:22px">✅</div><div style="font-size:13px;font-weight:700;color:var(--green)">${file.name}</div><div style="font-size:11px;color:var(--txt3)">${(file.size/1024).toFixed(0)} KB loaded</div>`;
     previewImport();
+  };
+  reader.onerror = () => {
+    document.getElementById('import-feedback').textContent = '❌ Could not read file';
+    document.getElementById('import-feedback').style.color = 'var(--red)';
   };
   reader.readAsText(file);
 }
